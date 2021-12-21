@@ -1,0 +1,24 @@
+---
+title: "Chapter 3: Cluster Sampling"
+author: "Adam Peterson"
+date: "12/19/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: surveybib.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+library(haven)
+library(gt)
+library(tidyverse)
+library(survey)
+library(srvyr)
+```
+
+
+## Why Clusters? The NHANES design

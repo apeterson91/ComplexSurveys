@@ -1,0 +1,252 @@
+---
+title: "Chapter 2"
+author: "Adam Peterson"
+date: "11/29/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: surveybib.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+library(haven)
+library(gt)
+library(tidyverse)
+```
+
+# Preface
+
+This document is a coded work through of Thomas Lumley's "Complex Surveys: A Guide 
+to Analysis in R" [@lumley2011complex]. Text reflects my understanding with additions made 
+to try and clarify ideas further.
+
+# Prior to Chapter 2: Design vs. Model
+
+Key to analysis of complex surveys is the idea of studying the design
+rather than the data. That is to say that the data are assumed to 
+be fixed in a traditional survey setting and the probabilities 
+of sampling different entities are used to derive the desired 
+estimate. These "weights"  are used to rebalance the data according 
+to the population distribution. Different sampling techniques 
+--- clustering, 2-phase, etc. ---  may be deemed appropriate in a 
+setting where the approach stands to improve the sampling.
+
+
+## Horvitz Thompson Estimation
+
+The Horvitz Thompson Estimator (HTE) is the starting point for non-uniform
+random estimates. If we observe measure $X_i$ on subject $i$ of a population of 
+$N$ total subjects the HTE is formulated as follows:
+
+$$
+HTE(X) = \sum_{i=1}^{N} \frac{1}{\pi_i}X_i
+$$
+The variance of this estimate is then
+
+$$
+V[HTE(X)] = \sum_{i,j} \left ( \frac{X_i X_j}{\pi_{ij}} - \frac{X_i}{\pi_i} \frac{X_j}{\pi_j} \right ),
+$$
+which follows from the bernoulli covariance using indicator variables
+$R_i=1$ if individual $i$ is in the sample, $R_i=0$ otherwise.
+
+## Design Effects
+
+[@kish1965survey] defined the notion of a *design effect* as the ratio of a 
+variance of an estimate in a complex sample to the variance of the same estimate
+in a simple random sample (SRS). The motivation for this entity being that 
+it can guide researchers in terms of how much sample size they may need.
+
+
+# Chapter 2
+
+## Starting from Simple Random Samples
+
+When dealing with *a sample* of size $n$ from a population of size $N$ 
+the HTE of the total value of $X_i$ in the population can be written as
+$$
+HTE(X) = \sum_{i=1}^{n} \frac{X_i}{\pi_i}
+$$
+
+What follows is a work-up of basic survey estimates using the California
+Academic Performance Index (API) dataset composed of student standardized test
+scores.
+```{r}
+library(survey)
+data(api)
+dplyr::as_tibble(apisrs)
+```
+
+```{r}
+srs_design <- svydesign(id = ~1, fpc = ~ fpc, data = apisrs)
+srs_design
+```
+
+```{r}
+svymean(~enroll, srs_design)
+```
+
+
+```{r}
+nofpc <- svydesign(id= ~1, weights = ~pw, data = apisrs)
+nofpc
+```
+
+```{r}
+svytotal(~enroll, nofpc)
+```
+
+```{r}
+svymean(~enroll,nofpc)
+```
+
+```{r}
+svytotal(~stype,srs_design)
+```
+
+```{r}
+svycontrast(svymean(~api00 + api99,srs_design),quote(api00-api99))
+```
+
+### Now again with the `srvyr` package
+
+```{r}
+library(srvyr)
+dstrata <- apisrs %>% 
+  as_survey_design(weights = pw)
+dstrata %>% 
+  mutate(api_diff = api00 - api99) %>% 
+  summarise(enroll_total = survey_total(enroll, vartype = "ci"),
+            api_diff = survey_mean(api_diff,vartype = "ci")) %>% 
+  gather(everything(),key="Estimand",value="Estimate") %>% 
+  gt() %>% 
+  fmt_number(columns = "Estimate")
+```
+
+
+
+## Stratified Sampling
+
+Simple random samples are not often used in complex surveys because 
+there is a justified concern that some strata (e.g. racial ethnic group, 
+age group, etc.) may be underrepresented in the sample if a simple random 
+sample were used. Consequently, a sample may be constructed so that 
+some units are guaranteed to be included within a given strata - improving 
+the resulting variance. When this is a 
+simple random sample, the HTE and variance of the total population is simply the 
+sum of the strata specific estimates. For example, in the `apistrat` data set
+a stratified random sample of 200 schools is recorded such that schools 
+are sampled randomly within school type (elementary, middle school or 
+high school).
+
+
+```{r}
+strat_design <- svydesign(id = ~1,
+                          strata = ~stype, 
+                          fpc = ~fpc, 
+                          data = apistrat)
+strat_design
+```
+
+```{r}
+svytotal(~enroll,strat_design)
+```
+
+```{r}
+svymean(~enroll,strat_design)
+```
+
+```{r}
+svytotal(~stype,strat_design)
+```
+
+```{r}
+srvyr_strat_design <- apistrat %>% 
+  as_survey_design(strata = stype,
+                   fpc = fpc)
+srvyr_strat_design
+```
+
+```{r}
+srvyr_strat_design %>% 
+  summarise(enroll_total = survey_total(enroll),
+            enroll_mean = survey_mean(enroll))
+```
+
+```{r}
+srvyr_strat_design %>% 
+  group_by(stype) %>% 
+  survey_count()
+```
+
+
+## Replicate Weights
+
+Replicate weights exploit sub-sampling to derive more generalizable 
+statistics than sampling weights.
+
+```{r}
+## Data are different
+#chis_adult <- read_dta("Data/ADULT.dta")
+#chis <- svrepdesign(variables = chis_adult[,1:418],
+#                    repweights = chis_adult[,420:499],
+#                    weights = chis_adult[,419,drop=TRUE],
+#                    combined.weights = TRUE,
+#                    type = "other", scale = 1, rscales = 1)
+```
+
+```{r}
+boot_design <- as.svrepdesign(strat_design, type = "bootstrap",
+                              replicates = 100)
+boot_design
+```
+
+
+
+```{r}
+jk_design <- as.svrepdesign(strat_design)
+jk_design
+```
+
+
+```{r}
+svymean(~enroll, boot_design)
+```
+
+
+```{r}
+svymean(~enroll, jk_design)
+```
+
+```{r}
+boot_design <- as_survey_design(strat_design,type="bootstrap",replicates = 100)
+boot_design
+```
+
+```{r}
+boot_design %>% summarise(Mean = survey_mean(enroll))
+```
+
+## Survey Quantile Estimation
+
+```{r}
+#svyquantile(~bmi_p, design = chis, quantiles = c(0.25, 0.5, 0.75))
+```
+
+```{r}
+svyquantile(~api00, design = strat_design, quantiles = c(0.25, 0.5, 0.75),
+            ci = TRUE)
+```
+## Contigency Tables
+
+
+```{r}
+```
+
+## Estimates in subpopulations
+
+## Design of Stratified Samples
+## References
