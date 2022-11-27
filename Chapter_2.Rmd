@@ -1,0 +1,500 @@
+---
+title: "Chapter 2: Simple and Stratified Sampling"
+author: "Adam Peterson"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: surveybib.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+library(gt)
+library(haven)
+library(patchwork)
+library(srvyr)
+library(survey)
+library(tidyverse)
+theme_set(
+    theme_bw() + 
+    theme(text = element_text(size = 24),
+          strip.background = element_blank())
+)
+```
+
+## Starting from Simple Random Samples
+
+When dealing with *a sample* of size $n$ from a population of size $N$ 
+the HTE of the total value of $X_i$ in the population can be written as 
+$$
+\begin{equation}
+HTE(X) = \hat{T_X} =  \sum_{i=1}^{n} \frac{X_i}{\pi_i}.
+\end{equation}
+$$
+Similarly the variance can be more explicitly written as
+$$
+\begin{equation}
+V[\hat{T_X}] = \frac{N-n}{N} \times N^{2} \times \frac{V[X]}{n},
+\end{equation}
+$$
+
+where $\frac{N-n}{N}$ is the finite population correction factor. This factor
+is [derived](https://stats.stackexchange.com/questions/5158/explanation-of-finite-population-correction-factor) from the hypergeometric distribution and explains the reduction in uncertainty
+that follows from sampling a large portion of the population. Consequently,
+if the sample is taken with replacement --- the same individual or unit
+has the possibility to be sampled twice ---  this term is no longer relevant.
+It should be noted that sampling with replacement is not usually used however, 
+but sometimes this language is used to refer to the fact that the finite 
+correction factor may not be used.
+
+The second term, $N^2$, rescales the estimate from the mean to the total, 
+while the final term is simply the scaled variance of $X$.
+
+A point worth deliberating on, that Lumley notes as well, is that while
+the above equations suggest that a larger sample size is always better that is
+not always the case in reality. Non-response bias or the cost of
+surveys can dramatically diminish the *quality* of the dataset, even if the size
+is large. I state this is worth deliberating on because it is a matter of 
+increasing importance in the world of "Big Data" - where it can be easy to 
+delude oneself with confidence in their estimates because their sample is large,
+even when the sample is not well designed. See [@meng2018statistical] for
+a larger discussion of this.
+
+
+It follows from the above that  the HTE for the population size is defined as
+$\hat{N} = \sum_{i=1}^{n} \frac{1}{\pi_i}$. This holds true in the case where,
+as here $\pi_i = \frac{n}{N}$, a bit trivial, but also in those where $\pi_i$ 
+may be defined differently.
+
+
+## Confidence Intervals
+
+The sampling distribution for the estimates 
+--- typically sample means and sums --- across "repeated surveys" is 
+Normal by the Central Limit Theorem, so the typical 
+$\bar{x} \pm 1.96 \sqrt{\frac{\sigma^2_X}{n}}$, expression is used to calculate
+a 95\% confidence interval. Lumley offers the following example from the 
+California Academic Performance Index (API) 
+[dataset](https://www.cde.ca.gov/re/pr/api.asp) to illustrate this idea.
+
+
+```{r clt_demo, fig.width = 14, fig.height = 8, cache = TRUE}
+data(api)
+mn_enroll <- mean(apipop$enroll, na.rm = TRUE)
+p1 <- apipop %>% 
+    ggplot(aes(x=enroll)) + 
+    geom_histogram() +
+    xlab("Student Enrollment") +
+    geom_vline(xintercept = mn_enroll, linetype = 2, color = 'red') +
+    ggtitle("Distribution of School Enrollment")
+p2 <- replicate(n = 1000, {
+    apipop %>% 
+        sample_n(200) %>% 
+        pull(enroll) %>% 
+        mean(. , na.rm = TRUE)})
+mn_sample_mn <- mean(p2)
+p2 <- tibble(sample_ix = 1:1000, sample_mean = p2) %>% 
+    ggplot(aes(x = sample_mean)) + 
+    geom_histogram() +
+    xlab("Student Enrollment Averages") +
+    geom_vline(xintercept = mn_sample_mn, 
+               linetype = 2, color = 'red') +
+    ggtitle("Distribution of Sample Means")
+p1 + p2
+```
+
+## Complex Sample Data in R
+What follows is a work-up of basic survey estimates using the California
+API dataset composed of student standardized test
+scores. I'll work through the code once using the `survey` package and 
+a second time using the `srvyr` package, which has a 
+[tidyverse](https://www.tidyverse.org/) friendly api.
+
+Much of the computational work in this book begins with creating a design 
+object, from which weights and other information can then be drawn on for
+any number/type of estimates.
+
+For example, we create a basic design object below, where we look at a
+classic simple random sample (SRS) of the schools in the API dataset. 
+
+```{r apisrs_view}
+dplyr::as_tibble(apisrs)
+```
+
+In the code below `fpc` stands for the aforementioned finite population 
+correction factor and `id=~1` designates the unit of analysis as each individual
+row in the dataset.
+
+```{r design_intro}
+srs_design <- svydesign(id=~1, fpc=~fpc, data = apisrs)
+srs_design
+```
+
+In order to calculate the mean enrollment based on this sample the, 
+appropriately named, `svymean` function can be used.
+```{r srs_svymean}
+svymean(~enroll, srs_design)
+```
+
+This is the same as the typical computation - which makes sense, this is a SRS!
+```{r srs_mean}
+c(
+  "Mean" = mean(apisrs$enroll),
+  "SE" = sqrt(var(apisrs$enroll) / nrow(apisrs))
+)
+```
+
+Instead of specifying the finite population correction factor, the 
+sampling weights could be used - since this is a SRS, all the weights 
+should be the same. 
+```{r srs_weights}
+as_tibble(apisrs) %>% distinct(pw)
+```
+
+```{r nofpc_design}
+nofpc <- svydesign(id=~1, weights=~pw, data = apisrs)
+nofpc
+```
+
+Use `svytotal` to calculate the estimate of the total across all schools,
+note that the standard error will be different between the two designs 
+because of the lack of fpc.
+```{r nofpc_svytotal}
+svytotal(~enroll, nofpc)
+```
+
+```{r srs_svytotal}
+svytotal(~enroll, srs_design)
+```
+
+Totals across groups can be calculated using the `~` notation with a categorical 
+variable.
+```{r total_cats}
+svytotal(~stype, srs_design)
+```
+
+`svycontrast` can be used to calculate the difference or addition of two different
+estimates - below we estimate the difference in the 2000 and 1999 scores based
+on the SRS design.
+```{r srs_contrast}
+svycontrast(svymean(~api00 + api99, srs_design), quote(api00 - api99))
+```
+
+### Now again with the `srvyr` package
+
+```{r srvyr_demo}
+dstrata <- apisrs %>% 
+  as_survey_design(fpc = fpc)
+dstrata %>% 
+  mutate(api_diff = api00 - api99) %>% 
+  summarise(enroll_total = survey_total(enroll, vartype = "ci"),
+            api_diff = survey_mean(api_diff, vartype = "ci")) %>% 
+  gt() 
+```
+
+## Stratified Sampling
+
+Simple random samples are not often used in complex surveys because 
+there is a justified concern that some strata (e.g. racial ethnic group, 
+age group, etc.) may be underrepresented in the sample if a simple random 
+sample were used. Similarly, complex designs can give the same precision at a 
+lower cost. Consequently, a sample may be constructed so that 
+some units are guaranteed to be included within a given strata - improving 
+the resulting variance. When this is a simple random sample, the HTE and 
+variance of the total population is simply the sum of the strata specific 
+estimates; $HTE(X) = \sum_{s=1}^{S} T^{s}_X$, where there are $S$ strata with
+
+For example, in the `apistrat` data set a stratified random sample 
+of 200 schools is recorded such that schools are sampled randomly within 
+school type (elementary, middle school or high school).
+
+
+
+In the code below we can designate the strata using the categorical variable
+`stype`, which denotes each of the school type stratas.
+```{r strat_design}
+strat_design <- svydesign(id=~1,
+                          strata = ~stype, 
+                          fpc = ~fpc, 
+                          data = apistrat)
+strat_design
+```
+
+```{r strat_total}
+svytotal(~enroll, strat_design)
+```
+
+```{r strat_mean}
+svymean(~enroll, strat_design)
+```
+
+```{r strat_cat_totals}
+svytotal(~stype, strat_design)
+```
+
+### Now again with the `srvyr` package
+```{r srvyr_strat}
+srvyr_strat_design <- apistrat %>% 
+  as_survey_design(strata = stype,
+                   fpc = fpc)
+srvyr_strat_design
+```
+
+```{r srvyr_strat_totals}
+srvyr_strat_design %>% 
+  summarise(enroll_total = survey_total(enroll),
+            enroll_mean = survey_mean(enroll)) %>%
+    gt()
+```
+
+```{r srvyr_strat_counts}
+srvyr_strat_design %>% 
+  group_by(stype) %>% 
+  survey_count()
+```
+
+Several points worth noting about stratified samples before moving on.
+
+  * Stratified samples get their power from "conditioning" on the strata 
+information that explain some of the variability in the measure. 
+
+  * Whereas a SRS might have a chance of leaving out an elementary or middle 
+  school, and leaving a higher estimate of enrollment, because of  
+  higher number of highschools in the sample, keeping a fixed number of samples 
+  within each strata removes this problem.
+  
+  * Stratified analysis may also refer to something entirely different from 
+  what we're discussing here --- where a subgroup has some model or estimate fit
+  only on that subgroup's data exclusively.
+
+
+## Replicate Weights
+
+Replicate weights exploit sub-sampling to derive more generalizable 
+statistics than sampling weights. This is of use when one is looking to estimate
+something like the median or a quantile which doesn't have an easily derived 
+variance. I'll try to dig into how these ideas work after reiterating Lumley's 
+ideas.
+
+Lumley discusses 3 variants briefly:
+
+1. [Balanced Repeated Replication](https://en.wikipedia.org/wiki/Balanced_repeated_replication) (BRR) Based on the work of [@mccarthy1966replication].
+  * [@judkins1990fay], extends BRR to handle issues with sparse signals and 
+    small samples.
+2. [Jackknife](https://en.wikipedia.org/wiki/Jackknife_resampling)
+  * Because BRR and Fay's method is difficult with other designs using 
+  overlapping subsamples, Jackknife and the bootstrap are intended to be more 
+  flexible.
+3. [Bootstrap](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))
+  * This is the method I'm most familiar with, outside of complex designs. 
+  * Lumley states that using the Bootstrap in this setting involves taking 
+  a sample (with replacement) of observations or clusters and multiplying the 
+  sampling weight by the number of times the observation appears in the sample.
+
+Each of these ideas relies on the fundamental idea that we can calculate the 
+variance of our statistic of interest by using 
+--- sometimes carefully chosen --- subsamples of our original sample to calculate
+our statistic of interest, as well as the variance of that statistic. Lumley
+gives a very basic equation to explain the theory here, but I thought I'd also
+link to the wikipedia page on 
+[empiricial distribution functions](https://en.wikipedia.org/wiki/Empirical_distribution_function), as much of the theory underlying these ideas relies on getting a good 
+estimate of the empirical distribution.
+
+It isn't explicitly clear which of these techniques is most popular currently, 
+but my guess would be that the bootstrap is the most used.
+This also happens to be the method that Lumley has provided the most citations 
+for in the text.
+
+### Replicate Weights in R
+
+
+Lumley first demonstrates how to setup a survey design object when the weights
+are already provided. I've had trouble accessing the 2005 California Health 
+Interview Survey [data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData.aspx) he uses in the text but I've pasted the code below as it seems straightforward enough.
+
+```{r}
+## Data are different
+# chis_adult <- read_dta("Data/ADULT.dta")
+#chis <- svrepdesign(variables = chis_adult[,1:418],
+#                    repweights = chis_adult[,420:499],
+#                    weights = chis_adult[,419,drop=TRUE],
+#                    ## combined.weights specifies that the replicate weights
+#                    ## include the sampling weights
+#                    combined.weights = TRUE,
+#                    type = "other", scale = 1, rscales = 1)
+```
+When creating replicate weights in R one specifies a replicate type to the 
+`type` argument.
+```{r bootstrap_design}
+boot_design <- as.svrepdesign(strat_design,
+                              type = "bootstrap",
+                              replicates = 100)
+boot_design
+```
+
+
+
+```{r jackknife_design}
+## jackknife is the default
+jk_design <- as.svrepdesign(strat_design)
+jk_design
+```
+
+
+```{r bootstrap_mean}
+svymean(~enroll, boot_design)
+```
+
+
+```{r jckknife_mean}
+svymean(~enroll, jk_design)
+```
+
+Of course, part of the motivation in using replicate weights is that you're 
+able to estimate standard errors for non-trivial estimands. Lumley demonstrates
+this using a sample from the [National Wilms Tumor Study Cohort](https://pubmed.ncbi.nlm.nih.gov/18027087/), in order to estimate
+the five year survival probability via a [Kaplan-Meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator) 
+Estimator.
+
+```{r ntwsco_view}
+library(addhazard)
+nwtsco <- as_tibble(nwtsco)
+head(nwtsco)
+```
+
+```{r}
+cases <- nwtsco %>% filter(relaps == 1)
+cases <- cases %>% mutate(wt = 1)
+ctrls <- nwtsco %>% filter(relaps == 0)
+ctrls <- ctrls %>%
+    mutate(wt = 10) %>% 
+    sample_n(325)
+ntw_sample <- rbind(cases, ctrls)
+
+fivesurv <- function(time, status, w) {
+    scurve <- survfit(Surv(time, status) ~ 1, weights = w)
+    ## minimum probability that corresponds to a survival time > 5 years
+    return(scurve$surv[min(which(scurve$time > 5))])
+}
+
+des <- svydesign(id = ~1, strata = ~relaps, weights = ~wt, data = ntw_sample)
+jkdes <- as.svrepdesign(des)
+withReplicates(jkdes, quote(fivesurv(trel, relaps, .weights)))
+```
+
+The estimated five year survival probability of 84% (95% CI: 84%,85%) uses
+the `fivesurv` function...
+
+### Now again with the `srvyr` package
+```{r}
+boot_design <- as_survey_design(strat_design, 
+                                type = "bootstrap", 
+                                replicates = 100)
+boot_design
+```
+
+```{r}
+boot_design %>% summarise(Mean = survey_mean(enroll))
+```
+
+## Survey Quantile Estimation
+
+```{r}
+#svyquantile(~bmi_p, design = chis, quantiles = c(0.25, 0.5, 0.75))
+```
+
+```{r}
+svyquantile(~api00, design = strat_design, quantiles = c(0.25, 0.5, 0.75),
+            ci = TRUE)
+```
+## Contigency Tables
+
+Lumley's main points in this section focus on the complications in interpretation 
+of typical contigency table tests of association in a design based setting.
+Specifically, he points out that it is not obvious how the null distribution should 
+be generated without making some kind of modeling assumptions. Quoting from 
+the book (text in parentheses from me):
+
+> For example, if there are 56,181,887 women and 62,710,561 men in a population it is not possible for the proportions of men and women who are unemployed to be the same, since these population sizes have no common factors. We would know without collecting any employment data
+> that the finite-population null hypothesis (of equal proportions) was false. A more interesting 
+> question is whether the finite population could have arisen from a process that had no association between the variables: is the difference at the population level small enough to have arisen by chance.... A simpler approach is to treat the sample as if it came from an infinite 
+superpopulation and simply ignore the finite-population corrections in inference.
+
+## Estimates in subpopulations
+
+Estimation of statistics within subpopulations (also called domain estimation) 
+that are strata are easy since a stratified sample is composed of random 
+samples within strata by definition;  simply compute the desired statistic 
+within the given strata using the strata-specific random sample. 
+
+When the subpopulation of interest is not a strata, things are more difficult. 
+While the sampling weights would still be correct for representing any
+given observation to the total population --- resulting in an unbiased 
+mean point estimate --- the co-occurrence probabilities $\pi_{i,j}$ 
+would be incorrect, because the co-occurrence probabilities are now 
+unknown/random and not fixed by design. Lumley doesn't go 
+into too much detail on how this addressed (even in the Appendix) but my reading
+is that he calculates the co-occurrence probabilities through a form 
+of empirical distribution/replicate weighting. Examples below looking at the 
+number of teachers with emergency, `emer` training amongst California
+schools using the `api` dataset.
+
+
+```{r}
+emerg_high <- subset(strat_design, emer > 20)
+emerg_low <- subset(strat_design, emer == 0)
+svymean(~api00+api99,emerg_high)
+```
+
+```{r}
+svymean(~api00+api00,emerg_low)
+```
+
+```{r}
+svytotal(~enroll,emerg_high)
+```
+
+```{r}
+svytotal(~enroll,emerg_low)
+```
+
+```{r}
+# bys <- svyby(~bmi_p, ~srsex+racehpr,svymean,design=chis,keep.names = FALSE)
+# print(bys, digits = 3)
+```
+
+If replicate weights are available, domain estimation is much easier.
+
+## Design of Stratified Samples
+
+How to pick the sample size for each strata? Lumley provides some discussion 
+with the usual principles of variance, cost and sample size driving the decision making:
+
+$$
+n_k \frac{\propto N_k \sigma_k}{\sqrt{\text{cost}_k}},
+$$
+where $n_k$ is the sample size for stratum $k$, $N_k$ is the population size in stratum $k$, $\sigma^{2}_k$ is the variance of $X$ in stratum $k$ and cost$_k$ is the 
+cost of sampling for strata $k$. The square root comes from the newyman's proof 
+for optimal allocations which (I believe) is likely based on a p-value or confidence 
+interval argument, which would require the standard error rather than the variance to be used.
+
+## Questions
+
+
+1.You are conducting a survey of emergency preparedness at a large HMO,where you want to estimate what proportion of medical staff would be able to get to work after an earthquake.
+
+a.) You can either send out a single questionnaire to all staff, or send out a questionnaire to about 10% of the staff and make follow-up phone calls for those that don't respond. What 
+are the disadvantages of each approach?
+
+This comes down to a discussion of cost for sampling and what missing data mechanism may be at play.
+As a simple starting point, if we were to assume the resulting data were MCAR and the non response rate was equivalent between both sampling strategies, the single questionnaire 
+would be preferred because it would result in a higher overall sample size.
+These assumptions are probably not likely however, and we may expect that non-response 
+is associated with other meaningful factors, by choosing a method that might minimize
+non-response we can both reduce bias and improve precision.
+
+## References

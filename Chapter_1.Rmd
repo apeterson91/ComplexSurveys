@@ -1,0 +1,125 @@
+---
+title: "Chapter 1"
+author: "Adam Peterson"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: surveybib.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Preface
+
+This document is a coded work through of Thomas Lumley's "Complex Surveys: A Guide 
+to Analysis in R" [@lumley2011complex]. These documents will reflect my 
+understanding of the material with additions made to try and clarify ideas further.
+
+# Design vs. Model
+
+Key to analysis of complex surveys is the idea of studying the design
+rather than the data. That is to say, that in a traditional survey setting the 
+data are assumed to be fixed and the probabilities of sampling different 
+entities are used to derive the desired estimate. These "weights"  are used to 
+re-balance the data so that they more accurately reflect the target 
+population distribution. Different sampling techniques 
+--- clustering, 2-phase, etc. ---  are used to either decrease the variance
+of the resulting estimate *or* decrease the cost associated with the design
+or both.
+
+
+## Horvitz Thompson Estimation
+
+The Horvitz Thompson Estimator (HTE) is the starting point for non-uniform
+random estimates. If we observe measure $X_i$ on subject $i$ of a population of 
+$N$ total subjects the HTE is formulated as follows:
+
+$$
+HTE(X) = \sum_{i=1}^{N} \frac{1}{\pi_i}X_i
+$$
+The variance of this estimate is then
+
+$$
+V[HTE(X)] = \sum_{i,j} \left ( \frac{X_i X_j}{\pi_{ij}} - \frac{X_i}{\pi_i} \frac{X_j}{\pi_j} \right ),
+$$
+which follows from the Bernoulli covariance using indicator variables
+$R_i=1$ if individual $i$ is in the sample, $R_i=0$ otherwise.
+
+## Design And MisSpecification Effects
+
+[@kish1965survey] defined the notion of a *design effect* as the ratio of a 
+variance of an estimate in a complex sample to the variance of the same estimate
+in a simple random sample (SRS). The motivation for this entity being that 
+it can guide researchers in terms of how much sample size they may need; 
+If the sample size for a given level of precision is known for a simple random sample, the sample size for a complex design can be obtained by multiplying by the design effect.
+
+
+While larger sample sizes may be more necessary to maintain the same level of
+variance as a SRS, the more complex may still be more justified because of the
+lower cost associated. See [@meng2018statistical] for an example of where
+design effects are used in a modern statistical setting.
+
+The misspecification effect is the ratio of the the variance of a correct 
+estimate to the incorrect variance from the result of a SRS. This value is used
+less in the modern era, but may still be worth knowing. 
+
+## Questions From Chapter 1
+
+1.1-1.2 Don't make sense to reproduce here.
+
+1.3 Each visit to the front page of a newspaper's website has (independently) a 
+1/1000 chance of resulting in a questionnaire on voting intentions in a 
+forthcoming election. Assuming that everyone who is given the questionnaire 
+responds, why are the results not a probability sample of
+  
+  * Voters?
+  * Readers of the newspaper?
+  * Readers of the newspaper's online version?
+  
+  
+Lumley lists 4 properties needed for a sample to be considered a probability
+sample.
+
+  1.Every individual (unit of analysis) in the population must have a non-zero 
+probability of ending up in the sample ($\pi_i>0 \forall i$)
+
+  2. $\pi_i$ must be known for every individual who does end up in the sample.
+  
+  3. Every pair of individuals in the sample must have a non-zero probability of 
+both ending up in the sample ($\pi_{i,j} \forall i, j$)
+
+  4. The probability $\pi_{i,j}$ must be known for every pair that does end up in
+the sample.
+
+1 is not guaranteed when considering voters --- there are voters who 
+don't read the paper who have will have $\pi_i = 0$ --- or the broader 
+heading of "readers" of the newspaper - since those who only read the 
+physical paper will have a $\pi_i = 0 $. 
+For "readers of the newspaper's online version" the sample would only be a
+probability sample if the time window was further specified, as there could be
+online readers who do not visit during the survey window, and would thus be 
+assigned a $\pi_i=0$.
+
+1.4 You are conducting a survey that will estimate the proportion of women 
+who used anti-malarial insecticide-treated bed nets every night during their
+last pregnancy. With a simple random sample you would need to recruit 50 women
+in any sub-population where you wanted a standard error of less than 5 
+percentage points in the estimate. You are using a sampling design that has
+given design effects of 2-3 for proportions in previous studies in similar 
+areas.
+
+  * Will you need a larger or smaller sample size than 50 for a subpopulation 
+  to get the desired precision?
+  Larger, a design effect $>1$ indicates that the variance is larger in the 
+  complex design with the same sample size - consequently 
+  the sample size will need to be increased to maintain the same level of 
+  precision.
+  
+  * Approximately what sample size will you need to get the desired precision?
+  100 - 150. Derived from multiplying 50 by 2 and 3.
+  
+## References  
