@@ -119,7 +119,7 @@ object, from which weights and other information can then be drawn on for
 any number/type of estimates.
 
 For example, we create a basic design object below, where we look at a
-classic simple random sample (SRS) of the schools in the API dataset. 
+classic simple random sample (SRS) of the schools in the API dataset.
 
 ```{r apisrs_view}
 dplyr::as_tibble(apisrs)
@@ -314,7 +314,8 @@ for in the text.
 
 Lumley first demonstrates how to setup a survey design object when the weights
 are already provided. I've had trouble accessing the 2005 California Health 
-Interview Survey [data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData.aspx) he uses in the text but I've pasted the code below as it seems straightforward enough.
+Interview Survey [data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData.aspx)
+he uses in the text but I've pasted the code below as it seems straightforward enough.
 
 ```{r}
 ## Data are different
@@ -327,7 +328,8 @@ Interview Survey [data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData
 #                    combined.weights = TRUE,
 #                    type = "other", scale = 1, rscales = 1)
 ```
-When creating replicate weights in R one specifies a replicate type to the 
+
+When *creating* replicate weights in R one specifies a replicate type to the 
 `type` argument.
 ```{r bootstrap_design}
 boot_design <- as.svrepdesign(strat_design,
@@ -387,11 +389,13 @@ withReplicates(jkdes, quote(fivesurv(trel, relaps, .weights)))
 ```
 
 The estimated five year survival probability of 84% (95% CI: 84%,85%) uses
-the `fivesurv` function...
+the `fivesurv` function which computes the kaplan meier estimate of five year
+survival probability fora given time status and weight. The `withReplicates` 
+function
 
 ### Now again with the `srvyr` package
 ```{r}
-boot_design <- as_survey_design(strat_design, 
+boot_design <- as_survey_rep(strat_design, 
                                 type = "bootstrap", 
                                 replicates = 100)
 boot_design
@@ -400,6 +404,11 @@ boot_design
 ```{r}
 boot_design %>% summarise(Mean = survey_mean(enroll))
 ```
+
+It's not clear or straightforward to me from reading the 
+`srvyr` [docs](http://gdfe.co/srvyr/articles/extending-srvyr.html) how 
+to estimate the weighted survival function probability --- I may return to this
+later.
 
 ## Survey Quantile Estimation
 
