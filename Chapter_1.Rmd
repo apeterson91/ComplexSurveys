@@ -15,21 +15,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Preface
 
-This document is a coded work through of Thomas Lumley's "Complex Surveys: A Guide 
+What follows is a coded work through of Thomas Lumley's "Complex Surveys: A Guide 
 to Analysis in R" [@lumley2011complex]. These documents will reflect my 
-understanding of the material with additions made to try and clarify ideas further.
+understanding of the material with additions made to try and clarify ideas 
+further. Lumley's website for this book/package is 
+[here](https://r-survey.r-forge.r-project.org/survey/).
 
 # Design vs. Model
 
-Key to analysis of complex surveys is the idea of studying the design
-rather than the data. That is to say, that in a traditional survey setting the 
-data are assumed to be fixed and the probabilities of sampling different 
-entities are used to derive the desired estimate. These "weights"  are used to 
-re-balance the data so that they more accurately reflect the target 
-population distribution. Different sampling techniques 
---- clustering, 2-phase, etc. ---  are used to either decrease the variance
-of the resulting estimate *or* decrease the cost associated with the design
-or both.
+Key to analysis of complex surveys is the idea of studying the design from which
+the data are constructed, rather than the data itself. That is to say, that 
+in a traditional survey setting the data are assumed to be fixed and the 
+probabilities of sampling different entities are used to derive the 
+desired estimate. These "weights"  are used to re-balance the data so that they 
+more accurately reflect the target population distribution. Different sampling 
+techniques --- clustering, 2-phase, etc. ---  are used to either decrease the 
+variance of the resulting estimate *or* decrease the cost associated with the 
+design or both.
 
 
 ## Horvitz Thompson Estimation
@@ -39,8 +41,9 @@ random estimates. If we observe measure $X_i$ on subject $i$ of a population of
 $N$ total subjects the HTE is formulated as follows:
 
 $$
-HTE(X) = \sum_{i=1}^{N} \frac{1}{\pi_i}X_i
+HTE(X) = \sum_{i=1}^{N} \frac{1}{\pi_i}X_i,
 $$
+which is an unbiased estimator as shown in the [Appendix].
 The variance of this estimate is then
 
 $$
@@ -121,5 +124,21 @@ areas.
   
   * Approximately what sample size will you need to get the desired precision?
   100 - 150. Derived from multiplying 50 by 2 and 3.
+ 
+ 
+## Appendix
+
+The HTE is an unbiased estimator of the population total - we reproduce the 
+expression from above, but now make explicit the indicator variables that express
+which observations are included in our sample, $\mathcal{S}$.
+$$
+HTE := \sum_n \frac{X_i I(X_i \in \mathcal{S})}{\pi_i} \\
+E[HTE] = E[\sum_n \frac{X_i I(X_i \in \mathcal{S})}{\pi_i} ] \\
+= \sum_n E[\frac{X_iI(X_i \in \mathcal{S})}{\pi_i}] \\
+= \sum_n \frac{X_iE[I(X_i \in \mathcal{S})]}{\pi_i} \\ 
+= \sum_n \frac{X_i \pi_i}{\pi_i} = \sum_n X_i
+$$
+
+
   
 ## References  

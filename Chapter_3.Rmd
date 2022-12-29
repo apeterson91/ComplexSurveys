@@ -18,15 +18,14 @@ library(gt)
 library(tidyverse)
 library(survey)
 library(srvyr)
-data(api)
 ```
 
 
 ## Why Clusters? The NHANES design
 
 Why sample clusters? Because sometimes it's easier than sampling individuals.
-Specifically, in cases where the *cost* of sampling individuals can be quite high
-sampling clusters can be more efficient, in spite of the fact that within 
+Specifically, in cases where the *cost* of sampling individuals can be quite 
+high, sampling clusters can be more efficient. In spite of the fact that within 
 cluster correlation tends to be positive, reducing the information in the 
 sample. Lumley uses the NHANES survey to motivate this idea: moving 
 mobile examination centers all across the country to sample individuals 
@@ -40,40 +39,71 @@ Depending on the type of clusters involved it can be easy to sample the entire
 cluster as classrooms, medical practice and workplaces are, however it is more 
 likely that some subsampling within clusters will be performed for the sake of
 efficiency. As Lumley notes, clusters in the first stage are called 
-*Primary Sampling Units* or PSUs.
+*Primary Sampling Units* or PSUs. "Stages" refer to the different 
+levels at which sampling occurs. E.g. Sampling individuals within sampled 
+census tracts within a state would involve sampling census tracts in the first
+stage and then individuals in the second stage.
 
 Sampling weights are determined assuming independence --- e.g. if a 
 cluster of houses is sampled with probability $\pi_1$ and a household 
 is sampled within that cluster with probability $\pi_2$ then the 
 sampling probability for that house is $\pi = \pi_1 \times \pi_2$ and 
-it's weight is the inverse of that probability.
+it's weight is the inverse of that probability. Note that this requires that
+clusters be mutually exclusive - a sampled unit can belong only to one 
+cluster and no others.
 
 Lumley goes on to describe how cluster sampling and individual sampling can be 
 mixed since each stratum of a survey can be thought of as a separate and 
 independent sample it is trivial to combine single stage sampling in one 
 stratum and multistage sampling in another; a stratified random sample can be 
-used in high density regions and a cluster sample can be taken in low density 
-regions. 
+used in high density regions where measurement of multiple units is less costly 
+and a cluster sample can be taken in low density regions where the cost of
+each additional unit is more costly. 
+
+The statistical rationale behind this strategy is fairly straightforward ---
+since the variance of the sum is the sum of the variances of each stage 
+(assuming independence) each sampled cluster in a multistage sample can be 
+considered as a population for further sampling. Lumley uses the 
+example of a simplified NHANES design, where 64 regions are grouped into 
+32 strata. A simple random sample of 440 individuals are then measured in each
+region. In Lumley's words, 
+
+> The variance of an estimated total from this design can be partitioned across
+> two sources: the variance of each estimated regional total around
+> the true total of the region and the variance that would result if the true 
+> total for each of the 64 sampled regions were known exactly.
+
+In my own words and understanding, I understand there to be variance that
+comes from grouping the 64 regions into 32 strata --- so there is uncertainty
+across region and then the uncertainty within that region that results from the
+sample of *only* a subset of the population.
 
 
-## Describing Multi Stage Designs in R
+## Describing Multi Stage Designs to R
 
 In order to specify a single stage cluster sample or a multistage sample treated 
 as a single stage sample with replacement, the main difference is that the 
 PSU identifier needs to be supplied to the `id` argument, as follows.
 
+```{r nhanes3_data, eval = FALSE}
+# Data found at 
+# "https://github.com/cran/LogisticDx/blob/master/data/nhanes3.rda"
+```
 ```{r}
-data(nhanes3)
+names3 <- load("data/Downloads/nhanes3.rda")
+as_tibble(nhanes3)
+```
+
+```{r}
 svydesign(id = ~ SDPPSU6, strat = ~SDPSTRA6,
           weight = ~WTPFHX6, 
           ## nest = TRUE indicates the PSU identifier is nested
-          ## within stratum
+          ## within stratum - repeeated across strata
           nest = TRUE,  
           data = nhanes3)
 ```
-In a multistage sample that uses information about finite population sizes, the
-`id`, `strata` and `fpc` arguments each specify a variable for each stage of
-sampling.
+SDPPSU6 is the pseudo PSU variable, and SDPSTRA6 is the stratum identifier
+defined for the single stage analysis.
 
 For example, a two stage design for the API population that samples 40 school 
 districts, then five schools within each district , the design has population 
@@ -83,6 +113,7 @@ The weights need not be supplied if they can be worked out from the
 other arguments.
 
 ```{r}
+data(api)
 as_tibble(apiclus2)
 ```
 
@@ -96,8 +127,18 @@ clus2_design
 
 ## Strata with only one PSU
 
-##  Sampling by Size
+When only one PSU exists within a population stratum, the sampling fraction 
+*must* be 100%, since otherwise it would be 0%. In this case, the 
+stratum does not contribute to the first stage variance and it
+should be ignored in calculating the first stage variance. Lumley argues
+that the best way to handle a stratum with only one PSU is to combine it with 
+another stratum, one that is chosen to be similar based on *population* data
+available before the study was done. The `survey` package has two different
+methods implemented to handle "lonely" PSU's.
 
+## How good is the single-stage approximation?
+
+##  Sampling by Size
 
 ```{r}
 data(election)

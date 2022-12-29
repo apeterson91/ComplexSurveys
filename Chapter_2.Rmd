@@ -245,6 +245,10 @@ svymean(~enroll, strat_design)
 svytotal(~stype, strat_design)
 ```
 
+Note that are standard errors are 0 for the within strata estimates 
+because if we have strata information on each member of the population, then 
+we know the strata counts without any uncertainty.
+
 ### Now again with the `srvyr` package
 
 ```{r srvyr_strat}
@@ -317,8 +321,8 @@ Lumley discusses 3 variants briefly:
 Each of these ideas relies on the fundamental idea that we can calculate
 the variance of our statistic of interest by using --- sometimes
 carefully chosen --- subsamples of our original sample to calculate our
-statistic of interest, as well as the variance of that statistic. Lumley
-gives a very basic equation to explain the theory here, but I thought
+statistic of interest and more importantly, the variance of that statistic. 
+Lumley gives a very basic equation to explain the theory here, but I thought
 I'd also link to the wikipedia page on [empiricial distribution
 functions](https://en.wikipedia.org/wiki/Empirical_distribution_function),
 as much of the theory underlying these ideas relies on getting a good
@@ -375,7 +379,8 @@ svymean(~enroll, jk_design)
 ```
 
 Of course, part of the motivation in using replicate weights is that
-you're able to estimate standard errors for non-trivial estimands.
+you're able to estimate standard errors for non-trivial estimands, especially
+those that may not be implemented in the `survey` package.
 Lumley demonstrates this using a sample from the [National Wilms Tumor
 Study Cohort](https://pubmed.ncbi.nlm.nih.gov/18027087/), in order to
 estimate the five year survival probability via a
@@ -411,7 +416,13 @@ withReplicates(jkdes, quote(fivesurv(trel, relaps, .weights)))
 The estimated five year survival probability of 84% (95% CI: 84%,85%)
 uses the `fivesurv` function which computes the kaplan meier estimate of
 five year survival probability fora given time status and weight. The
-`withReplicates` function
+`withReplicates` function then re-estimates this statistic using each set of
+replicates and calculates the standard error from the variability of these 
+estimates.
+
+Its worth noting that this is the standard error for estimating the five year 
+survival in the NWTS cohort, not the hypothetical superpopulation of all 
+children with Wilms' tumor.
 
 ### Now again with the `srvyr` package
 
@@ -431,7 +442,47 @@ It's not clear or straightforward to me from reading the `srvyr`
 estimate the weighted survival function probability --- I may return to
 this later.
 
-## Survey Quantile Estimation
+### Final Notes on Replicate Weights
+
+Lumley finishes this section by noting that the bootstrap typically works better
+when all the strata are large, while a strata correction is available it is 
+likely not correct for small or unequal strata. 
+
+Separately, Lumley note that both the jackknife and bootstrap can incorporate
+finite population correction factors.
+
+Finally, the BRR designs implemented in the `survey` package will use
+at most excess 4 replicate splits for $K < 180$ and at most 5% when $K > 100$. 
+It is not clear to me from the reading, which is more likely to be used for 
+$100 < K < 180$.
+
+## Other population summaries
+
+While population means, totals, and differences are typically easy to estimate
+via the horvitz thompson estimator there are other population statistics such
+as the median or regression estimates that are more complex. These require 
+using the replicate weights described in the previous 
+[section](#Replicate Weights).
+
+### Quantiles
+
+Estimation of quantiles involves estimating arbitary points along the 
+[cumulative distribution function](https://en.wikipedia.org/wiki/Cumulative_distribution_function)(cdf). For example, the 90th percentile has 90% of the estimated population size
+below it and 10% above. In this case, for cdf $F_X(x)$, we want to estimate
+$x: F_X(x) = 0.9$. However, estimating the cdf presents some technical 
+difficulties in that the 
+[empirical cumulative distribution function](https://en.wikipedia.org/wiki/Empirical_distribution_function) (ecdf),
+is not typically a "smooth" estimate for any given $x$ --- as the estimate is 
+highly dependent upon the sample. Consequently, Lumley's function, 
+`svyquantile()` interpolates linearly between two adjacent observations when the quantile is not uniquely defined. 
+
+```{r sample_ecdf, fig.cap="Empirical Cumulative Distribution Function - note the jumps at distinctive points along the x-axis."}
+samp <- rnorm(20)
+plot(ecdf(samp))
+```
+Confidence intervals are constructed similarly, using the ecdf, though it should be
+noted that estimating extreme quantiles poses difficulties because of the low 
+density values in the area.
 
 ```{r}
 #svyquantile(~bmi_p, design = chis, quantiles = c(0.25, 0.5, 0.75))
@@ -442,7 +493,7 @@ svyquantile(~api00, design = strat_design, quantiles = c(0.25, 0.5, 0.75),
             ci = TRUE)
 ```
 
-## Contigency Tables
+### Contigency Tables
 
 Lumley's main points in this section focus on the complications in
 interpretation of typical contigency table tests of association in a
@@ -463,10 +514,34 @@ me):
 > if it came from an infinite superpopulation and simply ignore the
 > finite-population corrections in inference.
 
-## Estimates in subpopulations
 
-Estimation of statistics within subpopulations (also called domain
-estimation) that are strata are easy since a stratified sample is
+The superpopulation approach offers the more interesting approach 
+philosophically and thus is implemented in the `survey` package. 
+The `svychisq` function implements a test for no association as the null
+using a chi-squared distribution with a correction for the mean and variance.
+Lumley's writing isn't quite clear here, but it sounds like two methods 
+for this approach are implemented but one is not used because of its performance
+in small samples, and takes a long time for very small p-values. This 
+appears to be a case where one has to hope the default approach is 
+generally appropriate.
+
+```{r, eval = FALSE}
+tab <- svymean(~interaction(ins, smoking, drop = TRUE), chis)
+tab
+```
+
+```{r, eval = FALSE}
+ftab <- ftable(tab, rownames = list(ins = c("Insured", "Uninsured"), 
+                                    smoking = c("Current", "Former", "Never"))
+               )
+```
+
+
+
+### Estimates in Subpopulations
+
+Estimation within subpopulations (also called domain estimation) that are 
+sampled strata is easy since a stratified sample is
 composed of random samples within strata by definition; simply compute
 the desired statistic within the given strata using the strata-specific
 random sample.
@@ -483,51 +558,57 @@ form of empirical distribution/replicate weighting. Examples below
 looking at the number of teachers with emergency, `emer` training
 amongst California schools using the `api` dataset.
 
-```{r}
+```{r subpop_1}
 emerg_high <- subset(strat_design, emer > 20)
 emerg_low <- subset(strat_design, emer == 0)
 svymean(~api00+api99,emerg_high)
 ```
 
-```{r}
+```{r subpop_2}
 svymean(~api00+api00,emerg_low)
 ```
 
-```{r}
+```{r subpop_3}
 svytotal(~enroll,emerg_high)
 ```
 
-```{r}
+```{r subpop_4}
 svytotal(~enroll,emerg_low)
 ```
 
-```{r}
+```{r subpop_5}
 # bys <- svyby(~bmi_p, ~srsex+racehpr,svymean,design=chis,keep.names = FALSE)
 # print(bys, digits = 3)
 ```
 
-If replicate weights are available, domain estimation is much easier.
+In general, if replicate weights are available, domain estimation is much easier.
 
 ## Design of Stratified Samples
 
-How to pick the sample size for each strata? Lumley provides some
-discussion with the usual principles of variance, cost and sample size
-driving the decision making:
+How to pick the sample size for each strata? Well it depends on the goals
+of the analysis. If the goal is to estimate a total across the whole population,
+the formula for the variance of a total can be used to gain insights about
+optimal allocation. Since the variance of the total is dependent (via sum) of
+the strata specific variances, more sample size would want to be dedicated to
+more heterogeneous and/or larger strata.
+
+This general approach means that the sample size for strata $k$, $n_k$
+should be proportional to the population strata size $N_k$ and strata variance
+$\sigma^{2}_k$, $n_k \propto \sqrt{N^2_k \sigma^2_k} = N_k \sigma_k$.
+Lumley notes that while this expression satisfies some theoretical optimality 
+criteria, it is often the case that different strata have different costs
+associated with their sampling and so the expression can be modified in 
+order to take into account this cost as follows:
 
 $$
 n_k \frac{\propto N_k \sigma_k}{\sqrt{\text{cost}_k}},
-$$ where $n_k$ is the sample size for stratum $k$, $N_k$ is the
-population size in stratum $k$, $\sigma^{2}_k$ is the variance of $X$ in
-stratum $k$ and cost$_k$ is the cost of sampling for strata $k$. The
-square root comes from the newyman's proof for optimal allocations which
-(I believe) is likely based on a p-value or confidence interval
-argument, which would require the standard error rather than the
-variance to be used.
+$$
+where cost$_k$ is the cost of sampling for strata $k$. 
 
 ## Questions
 
 1.You are conducting a survey of emergency preparedness at a large
-HMO,where you want to estimate what proportion of medical staff would be
+HMO, where you want to estimate what proportion of medical staff would be
 able to get to work after an earthquake.
 
 a.) You can either send out a single questionnaire to all staff, or send
@@ -542,7 +623,126 @@ equivalent between both sampling strategies, the single questionnaire
 would be preferred because it would result in a higher overall sample
 size. These assumptions are probably not likely however, and we may
 expect that non-response is associated with other meaningful factors, by
-choosing a method that might minimize non-response we can both reduce
-bias and improve precision.
+choosing a the follow-up phone call we might minimize non-response to both 
+reduce bias and improve precision.
+
+Additional relevant concerns would be the possible response or lack of response
+of certain strata --- certain physicians, technicians or other kinds of 
+staff's response would likely be worth knowing yet these groups may be less well 
+represented in a 10% simple random sample of the population.
+
+b.) You choose to survey just a sample. What would be useful variables to 
+stratify the sampling, and why?
+
+The aforementioned job title would be useful to stratify on. This would likely
+be most useful to conduct within each department. Further, if the HMO has
+more than one site or clinic, that would be worth stratifying on as well for 
+substantive reasons just as much as statistical reasons.
+
+c.) The survey was conducted with just two strata: physicians and other staff.
+The HMO has 900 physicians and 9000 other staff. You sample 450 physicians 
+and 450 other staff. What are the sampling probabilities in each stratum?
+
+physician strata sampling probabilities are
+$\frac{n}{N_k} = \frac{450}{900} = \frac{1}{2}$, while the 
+"other staff" probabilities are $\frac{450}{9000} = \frac{1}{20}$
+
+d.)  300 physicians and 150 other staff say they would be able to get to work
+after an earthquake. Give unbiased estimates of the proportion in each stratum
+and the total proportion.
+
+The physician strata estimate would be $\frac{300}{450} = \frac{2}{3}$.
+The staff strata would be $\frac{150}{450} = \frac{1}{3}$
+The total proportion would be $\frac{2 \times 300 + 20 \times 150}{9900}$.
+This value can be recreated below with the `survey` package as follows.
+```{r strata_q_setup}
+df <- tibble(id = 1:900, 
+             job = c(rep("MD",450), rep("staff",450)),
+             prep = c(rep(1,300), rep(0,150), rep(1,150), rep(0,300)),
+             weights = c(rep(2,450), rep(20,450)))
+hmo_design <- svydesign(strata =  ~ job, ids = ~ 0, weights = ~weights, data = df)
+hmo_design
+```
+
+```{r strata_q_answer}
+svymean(~prep, hmo_design)
+```
+
+
+e.) How would you explain to the managers that commissioned the study how the 
+estimate was computed and  why it wasn't just the number who said "yes" divided 
+by the total number surveyed?
+
+We sampled from the total population using the strata because we though these
+two groups would respond differently and indeed, they did. Physicians have 
+are twice as likely to be able to make it to the hospital in the event of an 
+emergency as general staff. However, physicians make up a much smaller 
+proportion of the overall hospital workforce and so we need to downweight their
+responses, relative to general staff in order to ensure their response reflects
+their distribution in the total population, thus the total estimate 
+of the HMO's emergency preparedness is much closer to the "general" staff's 
+strata estimate of $\frac{1}{3}$.
+
+
+2. You are conducting a survey of commuting time and means of transport for a 
+large university. What variables are likely to be available and useful for 
+stratifying the sampling?
+
+Probably worth stratifying on "role" at university --- student vs. staff vs. 
+professor. Each of these have varying amounts of income available and would
+likely determine their different means and, consequently, commute time of 
+getting to campus. It might also be worth stratifying on the department of
+employment for staff and professors, as there can be a wide variability in 
+these measures, again, by department.
+
+3.-4. Skip because of CHIS data issues
+
+5. In the Academic Performance Index data we saw large gains in precision from
+stratification on school type when estimating mean or total school size, 
+and no gain when estimating mean Academic performance Index. Would you expect
+a large or small gain from the following variables: `mobility`, `emer`,
+`meals`, `pcttest`? Compare your expectations with the actual results.
+
+6. For estimating total school enrollment in the Academic Performance Index 
+population, what is the optimal allocation of a total sample size of 200 stratified 
+by school size? 
+Draw a sample with this optimal allocation and compare the standard errors to 
+the stratified sample in Figure 2.5 for: 
+total enrollment, mean 2000 API, mean `meals`, mean `ell`.
+
+7. Figure 2.1 shows that the mean school size (enroll) in simple random samples 
+of size 200 from the Academic Performance Index population has close to a 
+Normal distribution.
+
+  a) Construct similar graphs for SRS of size 200, 50, 25, 10.
+  b) Repeat for median school size.
+  c) Repeat for mean school size in stratified samples of size 100, 52, 24, 12
+  using the same stratification proportions (50% elementary, 25% middle schools,
+  25% high schools) as in the built-in stratified sample.
+ 
+8. In a design with just two strata write the sample sizes as $n_1$ and $n-n_1$ so
+that there is only one quantity that can be varied. Differentiate the variance
+of the total with respect to $n_1$ to find the optimal allocation for two strata.
+Extend this to any number of strata by using the fact that an optimal allocation cannot be improved by moving samples from one stratum to another stratum.
+
+9. Write an R function taht takes inputs 
+$n_1, n_2, N_1, N_2, \sigma^2_1, \sigma^2_2$ and computes the variance of the population total in a stratified sample. Choose some reasonable values of the population
+sizes and variances, and graph this function as $n_1$ and $n_2$ change, to find
+the optimum and to examine how sensitive the variance is the precise values of $n_1$ 
+and $n_2$
+
+10. Verify that equation 2.2 gives the HTE of variance for a SRS
+
+a) Show that when $i \neq j$
+$$
+\pi_{ij} = \frac{n}{N}n - 1N - 1
+$$
+b) Compute $\pi_{ij} - \pi_i \pi_j$
+c) Show that the equation in exercise 1.10 (c) reduces to equation 2.2
+
+d) Suppose instead each individual in the population is independently sampled
+with probability $\frac{n}{N}$, so that the sample size $n$ is *not* fixed. 
+Show that the finite population correction disappears from equation 2.2 for this
+*Bernoulli sampling* design.
 
 ## References
