@@ -216,15 +216,16 @@ is it necessary to ask how many telephones are in the household, and what should
 be done with this information in computing the weights.
 
 It is necessary to ask how many telephones are in the household to downweight
-the *a priori* sampling probability accordingly because every additional
-telephone line increases the odds that a given house is sampled. For example in
-a simple population with two houses, where house one has 5 telephones and house
-two has 2 telephones, and we're looking to take a $n=1$ sample, but we don't
-know the number of telephones a priori, house one has a $\frac{5/7}$ probability
-of being sampled. If that is the house that is chosen its weight needs to go
-from 2 to $\frac{5}{7}$ to better reflect its sampling probability. In a real
-sample this would be corrected relative to all the other households number of
-telephones or perhaps a population average of the number of telephones.
+the *a priori* sampling probability accordingly because every additional 
+telephone line increases the odds that a given house is sampled. For example 
+in a simple population with two houses, where house one has 5 telephones and 
+house two has 2 telephones, and we're looking to take a $n=1$ sample, but we 
+don't know the number of telephones a priori, house one has a $\frac{5}{7}$ 
+probability of being sampled. If that is the house that is chosen its weight 
+needs to go from 2 to $\frac{5}{7}$ to better reflect its sampling probability. 
+In a real sample this would be corrected relative to all the other households 
+number of telephones or perhaps a population average of the number of 
+telephones.
 
 1.10
 
@@ -1231,9 +1232,9 @@ of *only* a subset of the population.
 
 ## Describing Multi Stage Designs to R
 
-In order to specify a single stage cluster sample or a multistage sample treated
-as a single stage sample with replacement, the main difference is that the PSU
-identifier needs to be supplied to the `id` argument, as follows.
+In order to specify a single stage cluster sample or a multistage sample 
+treated as a single stage sample with replacement, the main difference is that 
+the PSU identifier needs to be supplied to the `id` argument, as follows.
 
 ```{r nhanes3_data, eval = FALSE}
 # Data originally found at
@@ -1491,7 +1492,8 @@ pltdf %>%
   geom_pointrange(aes(ymin = lower, ymax = upper)) +
   xlab("Month in 1995/1996") +
   ylab("Total Income (USD)") +
-  ggtitle("Total Income from Suvey of Income and Program Participation")
+  ggtitle("Total Income Quantiles",
+          subtitle ="Survey of Income and Program Participation")
 ```
 
 ## Complications
@@ -1560,7 +1562,7 @@ medians %>%
   xlab("") +
   theme(
     legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, vjust = 0.25, hjust = 1)
+    axis.text.x = element_text(angle = 45, vjust = 0.25, hjust = .25)
   ) +
   ggtitle("Median BMI Across Race, Sex")
 ```
@@ -1577,7 +1579,7 @@ medians %>%
   theme(legend.title = element_blank(), legend.position = "top") +
   ggtitle("Median BMI by Race/Ethnicity and gender, from CHIS") +
   labs(caption = str_c(
-    "Line indicates CDC border between healthy and",
+    "Line indicates CDC border between healthy and ",
     "overweight BMI."
   ))
 ```
@@ -1732,6 +1734,9 @@ totals
 
 
 
+
+Lumley goes on to identify
+
 # Chapter 6: Categorical Data Regression
 
 # Chapter 7: Post-Stratification, Raking, and Calibration
@@ -1775,27 +1780,48 @@ $$ where $\pi_i = \frac{n_k}{\hat{N}_k}$. The consequence of this re-weighting
 means that the estimated sub group population is exactly correct and subsequent
 estimates within or across these groups benefit from the extra information.
 
-Of course, as Lumley notes, there's a problem if no entities were sampled in the
-particular strata of interest - you can't re-weight the number 0. Still since
-this is unlikely to happen for groups and samples of "reasonable" size
-post-stratification is still a worthy strategy given the potential reductions in
-variance that are possible.
+Of course, as Lumley notes, there's a problem if no entities were sampled
+in the particular strata of interest - you can't re-weight the number 0. Still
+since this is unlikely to happen for groups and samples of "reasonable" size
+post-stratification is still a worthy strategy given the potential reductions
+in variance that are possible.
 
+### Illustration
+
+Lumley's illustration of post-stratification looks at the two-stage sample 
+drawn from the API population, with 40 school districts sampled from California 
+and then up to 5 schools sampled from each district. Lumley uses this example
+to illustrate how improvements to precision can be made via post-stratification
+-- or not.
+
+
+We'll start with a reminder of the sample design used here: a two-stage sample.
 ```{r post_stratify}
 clus2_design
 ```
 
+Then information about the population group sizes is included in the call
+to `postStratify()` as well as the variable/strata across which to 
+post-stratify.
 ```{r ps_design_obj}
 pop.types <- data.frame(stype = c("E", "H", "M"), Freq = c(4421, 755, 1018))
 ps_design <- postStratify(clus2_design, strata = ~stype, population = pop.types)
 ps_design
 ```
 
-```{r ps_compare_2stage}
+
+Totals, and so on are then estimated in the usual fashion. In this 
+example there's a large difference in the variability of the estimated total
+when comparing the naive and post-stratified estimates because much of the 
+variability in the number of students enrolled can be explained by the school
+type - elementary schools are typically smaller than middle schools and 
+highschools. By including more information about the types of schools in the 
+overall population, the standard error is decreased by a factor of ~ 2.6.
+```{r ps_compare_2stage_enroll}
 svytotal(~enroll, clus2_design, na.rm = TRUE)
 ```
 
-```{r ps_compare_ps}
+```{r ps_compare_ps_enroll}
 svytotal(~enroll, ps_design, na.rm = TRUE)
 ```
 
@@ -1904,6 +1930,35 @@ pv_est_regm <- tibble(
   truth = pv_est$truth
 )
 ```
+In contrast, school type is not associated with the variability in the school
+scores measured by the Academic Performance Index - denoted below by `api00`. 
+
+
+```{r ps_compare_2stage_api}
+svymean(~api00, clus2_design)
+```
+
+```{r ps_compare_ps_api}
+svymean(~api00, ps_design)
+```
+
+Indeed, the score is specifically setup to be standardized across school types
+and as such there's little variance reduction observed by using the 
+post-stratification information in this instance. 
+
+Lumley notes that if the api dataset were a real survey, non response might
+vary as a function of school type and in which case post-stratification could
+help reduce non-response bias.
+
+
+### Raking
+
+If one were to post-stratify using more than one variable would require the
+complete joint distribution of both variables. This can be problematic either
+because the data for the joint distribution - or cross classification as 
+Lumley calls it - is not available, or because one of the cross - strata have
+no observations in the sample.
+>>>>>>> c266dafe4e8d19ae33b847602323533c78aab197
 
 ```{r}
 rbind(
