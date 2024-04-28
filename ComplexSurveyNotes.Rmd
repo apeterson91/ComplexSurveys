@@ -217,7 +217,7 @@ the *a priori* sampling probability accordingly because every additional
 telephone line increases the odds that a given house is sampled. For example 
 in a simple population with two houses, where house one has 5 telephones and 
 house two has 2 telephones, and we're looking to take a $n=1$ sample, but we 
-don't know the number of telephones a priori, house one has a $\frac{5/7}$ 
+don't know the number of telephones a priori, house one has a $\frac{5}{7}$ 
 probability of being sampled. If that is the house that is chosen its weight 
 needs to go from 2 to $\frac{5}{7}$ to better reflect its sampling probability. 
 In a real sample this would be corrected relative to all the other households 
@@ -1175,19 +1175,45 @@ b -> {c}
 
 Sampling weights are determined assuming independence across stages --- e.g. 
 if a cluster of houses is sampled with probability $\pi_1$ and a household is 
-sampled within that cluster with probability $\pi_2$ then the sampling probability for that house is $\pi = \pi_1 \times \pi_2$ and it's weight is the inverse of that probability. Note that this requires that clusters be mutually exclusive - a sampled unit can belong only to one cluster and no others. Further, note that we can still have biased sampling *within* a stage, as independence is only required across stages to use to find probabilities via their product.
+sampled within that cluster with probability $\pi_2$ then the sampling 
+probability for that house is $\pi = \pi_1 \times \pi_2$ and it's weight is the 
+inverse of that probability. Note that this requires that clusters be mutually 
+exclusive - a sampled unit can belong only to one cluster and no others. 
+Further, note that we can still have biased sampling *within* a stage, as 
+independence is only required across stages to use to find probabilities via 
+their product.
 
-Lumley goes on to describe how cluster sampling and individual sampling can be mixed since each stratum of a survey can be thought of as a separate and independent sample it is trivial to combine single stage sampling in one stratum and multistage sampling in another; a stratified random sample can be used in high density regions where measurement of multiple units is less costly and a cluster sample can be taken in low density regions where the cost of each additional unit is more costly.
+Lumley goes on to describe how cluster sampling and individual sampling can be 
+mixed since each stratum of a survey can be thought of as a separate and 
+independent sample it is trivial to combine single stage sampling in one 
+stratum and multistage sampling in another; a stratified random sample can be 
+used in high density regions where measurement of multiple units is less 
+costly and a cluster sample can be taken in low density regions where the cost 
+of each additional unit is more costly.
 
-The statistical rationale behind this strategy is fairly straightforward --- since the variance of the sum is the sum of the variances of each stage (assuming independence) each sampled cluster in a multistage sample can be considered as a population for further sampling. Lumley uses the example of a simplified NHANES design, where 64 regions are grouped into 32 strata. A simple random sample of 440 individuals are then measured in each region. In Lumley's words,
+The statistical rationale behind this strategy is fairly straightforward --- 
+since the variance of the sum is the sum of the variances of each stage 
+(assuming independence) each sampled cluster in a multistage sample can be 
+considered as a population for further sampling. Lumley uses the example of a 
+simplified NHANES design, where 64 regions are grouped into 32 strata. A 
+simple random sample of 440 individuals are then measured in each region. 
+In Lumley's words,
 
-> The variance of an estimated total from this design can be partitioned across two sources: the variance of each estimated regional total around the true total of the region and the variance that would result if the true total for each of the 64 sampled regions were known exactly.
+> The variance of an estimated total from this design can be partitioned 
+across two sources: the variance of each estimated regional total around the 
+true total of the region and the variance that would result if the true total 
+for each of the 64 sampled regions were known exactly.
 
-In my own words and understanding, I understand there to be variance that comes from grouping the 64 regions into 32 strata --- so there is uncertainty across region and then the uncertainty within that region that results from the sample of *only* a subset of the population.
+In my own words and understanding, I understand there to be variance that 
+comes from grouping the 64 regions into 32 strata --- so there is uncertainty 
+across region and then the uncertainty within that region that results from 
+the sample of *only* a subset of the population.
 
 ## Describing Multi Stage Designs to R
 
-In order to specify a single stage cluster sample or a multistage sample treated as a single stage sample with replacement, the main difference is that the PSU identifier needs to be supplied to the `id` argument, as follows.
+In order to specify a single stage cluster sample or a multistage sample 
+treated as a single stage sample with replacement, the main difference is that 
+the PSU identifier needs to be supplied to the `id` argument, as follows.
 
 ```{r nhanes3_data, eval = FALSE}
 # Data originally found at
@@ -1394,7 +1420,8 @@ pltdf %>%
   geom_pointrange(aes(ymin = lower, ymax = upper)) +
   xlab("Month in 1995/1996") +
   ylab("Total Income (USD)") +
-  ggtitle("Total Income from Suvey of Income and Program Participation")
+  ggtitle("Total Income Quantiles",
+          subtitle ="Survey of Income and Program Participation")
 ```
 
 ## Complications
@@ -1463,7 +1490,7 @@ medians %>%
   xlab("") +
   theme(
     legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, vjust = 0.25, hjust = 1)
+    axis.text.x = element_text(angle = 45, vjust = 0.25, hjust = .25)
   ) +
   ggtitle("Median BMI Across Race, Sex")
 ```
@@ -1480,7 +1507,7 @@ medians %>%
   theme(legend.title = element_blank(), legend.position = "top") +
   ggtitle("Median BMI by Race/Ethnicity and gender, from CHIS") +
   labs(caption = str_c(
-    "Line indicates CDC border between healthy and",
+    "Line indicates CDC border between healthy and ",
     "overweight BMI."
   ))
 ```
@@ -1492,6 +1519,9 @@ Lumley identifies two main uses for regression in analyzing complex surveys:
 
 1. Identifying relationships between variables --- similar to any other data.
 2. More accurate estimates of population means and totals.
+
+
+Lumley goes on to identify
 
 # Chapter 6: Categorical Data Regression
 
@@ -1543,67 +1573,73 @@ since this is unlikely to happen for groups and samples of "reasonable" size
 post-stratification is still a worthy strategy given the potential reductions
 in variance that are possible.
 
+### Illustration
 
+Lumley's illustration of post-stratification looks at the two-stage sample 
+drawn from the API population, with 40 school districts sampled from California 
+and then up to 5 schools sampled from each district. Lumley uses this example
+to illustrate how improvements to precision can be made via post-stratification
+-- or not.
+
+
+We'll start with a reminder of the sample design used here: a two-stage sample.
 ```{r post_stratify}
 clus2_design
 ```
 
+Then information about the population group sizes is included in the call
+to `postStratify()` as well as the variable/strata across which to 
+post-stratify.
 ```{r ps_design_obj}
 pop.types <- data.frame(stype = c("E", "H", "M"), Freq = c(4421, 755, 1018))
 ps_design <- postStratify(clus2_design, strata = ~stype, population = pop.types)
 ps_design
 ```
 
-```{r ps_compare_2stage}
+
+Totals, and so on are then estimated in the usual fashion. In this 
+example there's a large difference in the variability of the estimated total
+when comparing the naive and post-stratified estimates because much of the 
+variability in the number of students enrolled can be explained by the school
+type - elementary schools are typically smaller than middle schools and 
+highschools. By including more information about the types of schools in the 
+overall population, the standard error is decreased by a factor of ~ 2.6.
+```{r ps_compare_2stage_enroll}
 svytotal(~enroll, clus2_design, na.rm = TRUE)
 ```
 
-```{r ps_compare_ps}
+```{r ps_compare_ps_enroll}
 svytotal(~enroll, ps_design, na.rm = TRUE)
 ```
 
+In contrast, school type is not associated with the variability in the school
+scores measured by the Academic Performance Index - denoted below by `api00`. 
 
 
-```{r post_stratify_demo}
-prob_pv <- function(score) {
-  pmin(1, .5 * score + .5 * score^2)
-}
-num_days <- 30
-N_day <- 2E4
-
-pop_df <- map_dfr(1:num_days, function(day_ix){
-  df <- tibble(
-    scores = c(rlnorm(N_day, -5, 1.5), runif(1E4)),
-    day = day_ix
-  ) %>% 
-    mutate(
-      scores = pmin(1, scores),
-      pv = rbinom(N_day + 1E4, 1, prob = prob_pv(scores)),
-      score_bucket = floor(scores * 100)
-    ) %>% 
-  group_by(day,score_bucket) %>%
-  mutate(strata_size = n()) %>%
-  ungroup()
-}) %>% 
-  mutate(strata = interaction(day,score_bucket))
-
-samp <- pop_df %>%
-  group_by(strata) %>%
-  slice_sample(n = 5, replace = FALSE) %>% 
-  ungroup() %>% 
-  mutate(weight = strata_size / n())
-
-samp_ds <- samp %>% 
-  as_survey_design(fpc = strata_size, strata = strata)
-
-samp_ds %>% 
-  summarize(pv_all = survey_total(pv, vartype = "ci"))
+```{r ps_compare_2stage_api}
+svymean(~api00, clus2_design)
 ```
 
-```{r}
-
+```{r ps_compare_ps_api}
+svymean(~api00, ps_design)
 ```
 
+Indeed, the score is specifically setup to be standardized across school types
+and as such there's little variance reduction observed by using the 
+post-stratification information in this instance. 
+
+Lumley notes that if the api dataset were a real survey, non response might
+vary as a function of school type and in which case post-stratification could
+help reduce non-response bias.
+
+
+### Raking
+
+If one were to post-stratify using more than one variable would require the
+complete joint distribution of both variables. This can be problematic either
+because the data for the joint distribution - or cross classification as 
+Lumley calls it - is not available, or because one of the cross - strata have
+no observations in the sample.
 
 
 # Chapter 8: Two-Phase Sampling
