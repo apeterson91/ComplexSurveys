@@ -8,6 +8,9 @@ output:
     toc: true
     toc_float: true
 bibliography: surveybib.bib
+editor_options: 
+  markdown: 
+    wrap: 80
 ---
 
 ```{r setup, include=FALSE}
@@ -32,36 +35,36 @@ theme_set(theme_bw() + theme(
 
 # Preface
 
-What follows is a coded work through of Thomas Lumley's "Complex Surveys: A 
+What follows is a coded work through of Thomas Lumley's "Complex Surveys: A
 Guide to Analysis in R" [@lumley2011complex]. These documents will reflect my
-understanding of the material with additions made to try and clarify ideas 
-further. These include simulations, derivations or references that I found 
-helpful in working through Lumley's material. Most of the datasets that I use 
-throughout these notes are from Lumley's website for the 
-[book](https://r-survey.r-forge.r-project.org/survey/). However, I'll also 
-create my own simulated datasets so that it can be understood both how to 
-analyze data that have been sampled as described in this book, as well as how 
-to perform the sampling and construct the inclusion probabilities / sampling 
-weights. This latter half is not elaborated on to the same extent in this text 
+understanding of the material with additions made to try and clarify ideas
+further. These include simulations, derivations or references that I found
+helpful in working through Lumley's material. Most of the datasets that I use
+throughout these notes are from Lumley's website for the
+[book](https://r-survey.r-forge.r-project.org/survey/). However, I'll also
+create my own simulated datasets so that it can be understood both how to
+analyze data that have been sampled as described in this book, as well as how to
+perform the sampling and construct the inclusion probabilities / sampling
+weights. This latter half is not elaborated on to the same extent in this text
 but I think it is just as important in an applied context.
 
 # Chapter 1: The Basics
 
 ## Design vs. Model
 
-Key to analysis of complex surveys is the idea of studying the design from 
-which the data are constructed, rather than the data itself. That is to say, 
-that in a traditional survey setting the data are assumed to be fixed and the 
-probabilities of sampling different entities are used to derive the desired 
-estimate. These "weights" are used to re-balance the data so that they more 
-accurately reflect the target population distribution. Different sampling 
-techniques --- clustering, 2-phase, etc. --- are used to either decrease the 
-variance of the resulting estimate *or* decrease the cost associated with the 
+Key to analysis of complex surveys is the idea of studying the design from which
+the data are constructed, rather than the data itself. That is to say, that in a
+traditional survey setting the data are assumed to be fixed and the
+probabilities of sampling different entities are used to derive the desired
+estimate. These "weights" are used to re-balance the data so that they more
+accurately reflect the target population distribution. Different sampling
+techniques --- clustering, 2-phase, etc. --- are used to either decrease the
+variance of the resulting estimate *or* decrease the cost associated with the
 design or both.
 
 ### Horvitz Thompson Estimation
 
-The Horvitz Thompson Estimator (HTE) is the starting point for non-uniform 
+The Horvitz Thompson Estimator (HTE) is the starting point for non-uniform
 random estimates. If we observe measure $X_i$ on subject $i$ of a population of
 $N$ total subjects the HTE is formulated as follows:
 
@@ -78,27 +81,27 @@ V[HTE(X)] = \sum_{i,j} \left ( \frac{X_i X_j}{\pi_{ij}} -
 \frac{X_i}{\pi_i} \frac{X_j}{\pi_j} \right ),
 $$
 
-which follows from the Bernoulli covariance using indicator variables $R_i=1$ 
-if individual $i$ is in the sample, $R_i=0$ otherwise. A proof is provided in 
-the [Questions From Chapter 1].
+which follows from the Bernoulli covariance using indicator variables $R_i=1$ if
+individual $i$ is in the sample, $R_i=0$ otherwise. A proof is provided in the
+[Questions From Chapter 1].
 
 ### Design And Misspecification Effects
 
-[@kish1965survey] defined the notion of a *design effect* as the ratio of a 
-variance of an estimate in a complex sample to the variance of the same 
-estimate in a simple random sample (SRS). The motivation for this entity being 
-that it can guide researchers in terms of how much sample size they may need; 
-If the sample size for a given level of precision is known for a simple random 
-sample, the sample size for a complex design can be obtained by multiplying by 
-the design effect.
+[@kish1965survey] defined the notion of a *design effect* as the ratio of a
+variance of an estimate in a complex sample to the variance of the same estimate
+in a simple random sample (SRS). The motivation for this entity being that it
+can guide researchers in terms of how much sample size they may need; If the
+sample size for a given level of precision is known for a simple random sample,
+the sample size for a complex design can be obtained by multiplying by the
+design effect.
 
-While larger sample sizes may be more necessary to maintain the same level of 
-variance as a SRS, the more complex may still be more justified because of the 
+While larger sample sizes may be more necessary to maintain the same level of
+variance as a SRS, the more complex may still be more justified because of the
 lower cost associated. See [@meng2018statistical] for an example of where design
 effects are used in a modern statistical setting.
 
-The misspecification effect is the ratio of the the variance of a correct 
-estimate to the incorrect variance from the result of a SRS. This value is used 
+The misspecification effect is the ratio of the the variance of a correct
+estimate to the incorrect variance from the result of a SRS. This value is used
 less in the modern era, but may still be worth knowing.
 
 ## Questions From Chapter 1
@@ -106,144 +109,141 @@ less in the modern era, but may still be worth knowing.
 1.1-1.2 Don't make sense to reproduce here.
 
 1.3 Each visit to the front page of a newspaper's website has (independently) a
-1/1000 chance of resulting in a questionnaire on voting intentions in a 
-forthcoming election. Assuming that everyone who is given the questionnaire 
+1/1000 chance of resulting in a questionnaire on voting intentions in a
+forthcoming election. Assuming that everyone who is given the questionnaire
 responds, why are the results not a probability sample of
 
 -   Voters?
 -   Readers of the newspaper?
 -   Readers of the newspaper's online version?
 
-Lumley lists 4 properties needed for a sample to be considered a probability 
+Lumley lists 4 properties needed for a sample to be considered a probability
 sample.
 
-1.  Every individual (unit of analysis) in the population must have a non-zero 
-probability of ending up in the sample ($\pi_i>0 \forall i$)
+1.  Every individual (unit of analysis) in the population must have a non-zero
+    probability of ending up in the sample ($\pi_i>0 \forall i$)
 
 2.  $\pi_i$ must be known for every individual who does end up in the sample.
 
 3.  Every pair of individuals in the sample must have a non-zero probability of
-both ending up in the sample ($\pi_{i,j} \forall i, j$)
+    both ending up in the sample ($\pi_{i,j} \forall i, j$)
 
-4.  The probability $\pi_{i,j}$ must be known for every pair that does end up 
-in the sample.
+4.  The probability $\pi_{i,j}$ must be known for every pair that does end up in
+    the sample.
 
-1 is not guaranteed when considering voters --- there are voters who don't 
-read the paper who have will have $\pi_i = 0$ --- or the broader heading of 
-"readers" of the newspaper - since those who only read the physical paper will 
-have a \$\pi\_i = 0 \$. For "readers of the newspaper's online version" the 
-sample would only be a probability sample if the time window was further 
-specified, as there could be online readers who do not visit during the survey 
-window, and would thus be assigned a $\pi_i=0$.
+1 is not guaranteed when considering voters --- there are voters who don't read
+the paper who have will have $\pi_i = 0$ --- or the broader heading of "readers"
+of the newspaper - since those who only read the physical paper will have a
+\$\pi\_i = 0 \$. For "readers of the newspaper's online version" the sample
+would only be a probability sample if the time window was further specified, as
+there could be online readers who do not visit during the survey window, and
+would thus be assigned a $\pi_i=0$.
 
-1.4 You are conducting a survey that will estimate the proportion of women who 
-used anti-malarial insecticide-treated bed nets every night during their last 
-pregnancy. With a simple random sample you would need to recruit 50 women in 
-any sub-population where you wanted a standard error of less than 5 percentage 
-points in the estimate. You are using a sampling design that has given design 
+1.4 You are conducting a survey that will estimate the proportion of women who
+used anti-malarial insecticide-treated bed nets every night during their last
+pregnancy. With a simple random sample you would need to recruit 50 women in any
+sub-population where you wanted a standard error of less than 5 percentage
+points in the estimate. You are using a sampling design that has given design
 effects of 2-3 for proportions in previous studies in similar areas.
 
--   Will you need a larger or smaller sample size than 50 for a subpopulation 
-to get the desired precision?
+-   Will you need a larger or smaller sample size than 50 for a subpopulation to
+    get the desired precision?
 
-Larger, a design effect $>1$ indicates that the variance is larger in the 
-complex design with the same sample size - consequently the sample size will 
+Larger, a design effect $>1$ indicates that the variance is larger in the
+complex design with the same sample size - consequently the sample size will
 need to be increased to maintain the same level of precision.
 
 -   Approximately what sample size will you need to get the desired precision?
 
 100 - 150. Derived from multiplying 50 by 2 and 3.
 
-1.5 Systematic sampling involves taking a list of the population and choosing, 
+1.5 Systematic sampling involves taking a list of the population and choosing,
 for example, every 100th entry in the list.
 
 a)  Which of the necessary properties of a probability sample does this have?
 
-Items 2-4 from the list enumerated above. The only condition that is not 
+Items 2-4 from the list enumerated above. The only condition that is not
 satisfied is that not every item has a nonzero probability of being chosen.
 
-b)  For systematic sampling with a random start, the procedure would be to 
-choose a random starting point from 1, 2, ..., 1000 and then take every 100th 
-entry starting at the random point. Which of the necessary properties of a 
-probability sample does this procedure have?
+b)  For systematic sampling with a random start, the procedure would be to
+    choose a random starting point from 1, 2, ..., 1000 and then take every
+    100th entry starting at the random point. Which of the necessary properties
+    of a probability sample does this procedure have?
 
 This satisfies all items from the above list.
 
-c)  For systematic sampling with multiple random starts we might choose 5 
-random starting points in 1, 2, ....., 5000 and then take every 500th entry 
-starting from each of the 5 random points. Which of the necessary properties 
-of a probability sample does this procedure have?
+c)  For systematic sampling with multiple random starts we might choose 5 random
+    starting points in 1, 2, ....., 5000 and then take every 500th entry
+    starting from each of the 5 random points. Which of the necessary properties
+    of a probability sample does this procedure have?
 
 Again, this satisfies all items from the above list.
 
-d)  If the list were shuffled into a random order before a systematic sample 
-was taken, which of the properties would the procedure have.
+d)  If the list were shuffled into a random order before a systematic sample was
+    taken, which of the properties would the procedure have.
 
-Again, all of them. The key is adding the *known* randomness and not excluding 
+Again, all of them. The key is adding the *known* randomness and not excluding
 any items from selection.
 
-e)  Treating a systematic sample as if it were a simple random sample often 
-gives good results. Why would this be true?
+e)  Treating a systematic sample as if it were a simple random sample often
+    gives good results. Why would this be true?
 
-This would be because the items are not ordered in any particular fashion 
-prior to taking the "systematic sampling". In this setting a systematic sample 
-is equivalent to a simple random sample.
+This would be because the items are not ordered in any particular fashion prior
+to taking the "systematic sampling". In this setting a systematic sample is
+equivalent to a simple random sample.
 
-1.6 Why must all the sampling probabilities be non-zero to get a valid 
+1.6 Why must all the sampling probabilities be non-zero to get a valid
 population estimate?
 
-If any of the sampling probabilities are zero, that would introduce bias in 
-shifting the estimate away from the *always* unobserved portion of the 
+If any of the sampling probabilities are zero, that would introduce bias in
+shifting the estimate away from the *always* unobserved portion of the
 population.
 
-1.7 Why must all the pairwise probabilities be non-zero to get a valid 
+1.7 Why must all the pairwise probabilities be non-zero to get a valid
 uncertainty estimate.
 
-This is basically a second order statement equivalent to the previous. If any 
-pair is unable to be observed together that is a form of selection bias that 
+This is basically a second order statement equivalent to the previous. If any
+pair is unable to be observed together that is a form of selection bias that
 would shift the population estimate away from the true value.
 
-1.8 A probability design assumes that people who are sampled will actually be 
-included in the sample, rather than refusing. Look up the response rates for 
-the most recent year of BRFSS and NHANES.
+1.8 A probability design assumes that people who are sampled will actually be
+included in the sample, rather than refusing. Look up the response rates for the
+most recent year of BRFSS and NHANES.
 
-1.9 In a telephone study using random digit dialing, telephone numbers are 
-sampled with equal probability from a list. When a household is recruited, why 
-is it necessary to ask how many telephones are in the household, and what 
-should be done with this information in computing the weights.
+1.9 In a telephone study using random digit dialing, telephone numbers are
+sampled with equal probability from a list. When a household is recruited, why
+is it necessary to ask how many telephones are in the household, and what should
+be done with this information in computing the weights.
 
 It is necessary to ask how many telephones are in the household to downweight
-the *a priori* sampling probability accordingly because every additional 
-telephone line increases the odds that a given house is sampled. For example 
-in a simple population with two houses, where house one has 5 telephones and 
-house two has 2 telephones, and we're looking to take a $n=1$ sample, but we 
-don't know the number of telephones a priori, house one has a $\frac{5/7}$ 
-probability of being sampled. If that is the house that is chosen its weight 
-needs to go from 2 to $\frac{5}{7}$ to better reflect its sampling probability. 
-In a real sample this would be corrected relative to all the other households 
-number of telephones or perhaps a population average of the number of 
-telephones.
+the *a priori* sampling probability accordingly because every additional
+telephone line increases the odds that a given house is sampled. For example in
+a simple population with two houses, where house one has 5 telephones and house
+two has 2 telephones, and we're looking to take a $n=1$ sample, but we don't
+know the number of telephones a priori, house one has a $\frac{5/7}$ probability
+of being sampled. If that is the house that is chosen its weight needs to go
+from 2 to $\frac{5}{7}$ to better reflect its sampling probability. In a real
+sample this would be corrected relative to all the other households number of
+telephones or perhaps a population average of the number of telephones.
 
 1.10
 
 Derive the Horvitz Thompson variance estimator for the total as follows.
 
-a) Write $R_i = 1$ if individual $i$ is in the sample, $R_i=0$ otherwise. Show
-that $V[R_i] = \pi_i(1-\pi_i)$ and that $Cov[R_i,R_j]=\pi_{ij} - \pi_i\pi_j$.
+a)  Write $R_i = 1$ if individual $i$ is in the sample, $R_i=0$ otherwise. Show
+    that $V[R_i] = \pi_i(1-\pi_i)$ and that
+    $Cov[R_i,R_j]=\pi_{ij} - \pi_i\pi_j$.
 
 This follows in a straightforward fashion assumign that $R_i$ is distributed
-according to the binomial distribution. This is an accurate model for 
-sampling with replacement, or sampling from large populations with small sample
-sizes without replacement, but less true for small sample sizes without 
-replacement.
+according to the binomial distribution. This is an accurate model for sampling
+with replacement, or sampling from large populations with small sample sizes
+without replacement, but less true for small sample sizes without replacement.
 
-b) Show that the variance of the Horvitz Thompson estimator is:
+b)  Show that the variance of the Horvitz Thompson estimator is:
 
 $$
 V[\hat{T}_{HT}] = \sum_{i=1}^{N}\sum_{j=1}^{N} \check{x}_i\check{x}_j(\pi_{ij} - \pi_i \pi_j)
-$$
-We have,
-$$
+$$ We have, $$
 HTE:= \sum_{i=1}^{N} \frac{X_i I(X_i \in \mathcal{S})}{\pi_i} \\
 V[HTE] = V\left[\sum_{i=1}^{N}\frac{X_i I(X_i \in \mathcal{S})}{\pi_i} \right] \\ 
 =\sum_{i=1}^{N}\sum_{j=1}^{N} Cov\left[\frac{X_i I(i \in \mathcal{S})}{\pi_i},
@@ -256,14 +256,13 @@ $$
 
 which is equivalent to the above, where $\check{x_i} = \frac{X_i}{\pi_i}$.
 
-c) Show that an unbiased estimator of the variance is 
-$$
-\hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{N}\sum_{j=1}^{N} 
-\frac{R_i R_j}{\pi_{ij}}\check{x_i}\check{x_j}(\pi_{ij} - \pi_i \pi_j)
-$$
-d) Show that the previous expression simplifies to equation 1.2
+c)  Show that an unbiased estimator of the variance is $$
+    \hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{N}\sum_{j=1}^{N} 
+    \frac{R_i R_j}{\pi_{ij}}\check{x_i}\check{x_j}(\pi_{ij} - \pi_i \pi_j)
+    $$
+d)  Show that the previous expression simplifies to equation 1.2
 
-1.11 Another popular way to write the Horvitz-Thompson variance estimator is 
+1.11 Another popular way to write the Horvitz-Thompson variance estimator is
 
 $$
 \hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{n} x_i^{2} \frac{1-\pi_i}{\pi_i^2} + \sum_{i\neq j}x_ix_j\frac{\pi_{ij} - \pi_i \pi_j}{\pi_i\pi_j\pi_{ij}}
@@ -271,8 +270,8 @@ $$
 
 ## Chapter 1 Appendix
 
-The HTE is an unbiased estimator of the population total - I reproduce the 
-expression from above, but now make explicit the indicator variables that 
+The HTE is an unbiased estimator of the population total - I reproduce the
+expression from above, but now make explicit the indicator variables that
 express which observations are included in our sample, $\mathcal{S}$.
 
 $$
@@ -283,13 +282,12 @@ E[HTE] = E\left [\sum_n \frac{X_i I(X_i \in \mathcal{S})}{\pi_i} \right ] \\
 = \sum_n \frac{X_i \pi_i}{\pi_i} = \sum_n X_i
 $$
 
-
 # Chapter 2: Simple and Stratified Sampling
 
 ## Starting from Simple Random Samples
 
-When dealing with *a sample* of size $n$ from a population of 
-size $N$ the HTE of the total value of $X_i$ in the population can be written as
+When dealing with *a sample* of size $n$ from a population of size $N$ the HTE
+of the total value of $X_i$ in the population can be written as
 
 $$
 \begin{equation}
@@ -297,7 +295,7 @@ HTE(X) = \hat{T_X} =  \sum_{i=1}^{n} \frac{X_i}{\pi_i}.
 \end{equation}
 $$
 
-For a simple random sample, the variance can be more explicitly written as 
+For a simple random sample, the variance can be more explicitly written as
 
 $$
 \begin{equation}
@@ -305,41 +303,41 @@ V[\hat{T_X}] = \frac{N-n}{N} \times N^{2} \times \frac{V[X]}{n},
 \end{equation}
 $$
 
-where $\frac{N-n}{N}$ is the finite population correction factor. This factor is 
+where $\frac{N-n}{N}$ is the finite population correction factor. This factor is
 [derived](https://stats.stackexchange.com/questions/5158/explanation-of-finite-population-correction-factor)
-from the hypergeometric distribution and explains the reduction in uncertainty 
-that follows from sampling a large portion of the population. Consequently, if 
-the sample is taken with replacement --- the same individual or unit has the 
-possibility to be sampled twice --- this term is no longer relevant. It should 
-be noted that sampling with replacement is not usually used however, but 
-sometimes this language is used to refer to the fact that the finite correction 
+from the hypergeometric distribution and explains the reduction in uncertainty
+that follows from sampling a large portion of the population. Consequently, if
+the sample is taken with replacement --- the same individual or unit has the
+possibility to be sampled twice --- this term is no longer relevant. It should
+be noted that sampling with replacement is not usually used however, but
+sometimes this language is used to refer to the fact that the finite correction
 factor may not be used.
 
-The second term, $N^2$, rescales the estimate from the mean to the total, 
-while the final term is simply the scaled variance of $X$.
+The second term, $N^2$, rescales the estimate from the mean to the total, while
+the final term is simply the scaled variance of $X$.
 
-A point worth deliberating on, that Lumley notes as well, is that while the 
-above equations suggest that a larger sample size is always better that is not 
-always the case in reality. Non-response bias or the cost of surveys can 
-dramatically diminish the *quality* of the dataset, even if the size is large. 
-I state this is worth deliberating on because it is a matter of increasing 
-importance in the world of "Big Data" - where it can be easy to delude oneself 
-with confidence in their estimates because their sample is large, even when 
-the sample is not well designed. See [@meng2018statistical] for a larger 
-discussion of this topic.
+A point worth deliberating on, that Lumley notes as well, is that while the
+above equations suggest that a larger sample size is always better that is not
+always the case in reality. Non-response bias or the cost of surveys can
+dramatically diminish the *quality* of the dataset, even if the size is large. I
+state this is worth deliberating on because it is a matter of increasing
+importance in the world of "Big Data" - where it can be easy to delude oneself
+with confidence in their estimates because their sample is large, even when the
+sample is not well designed. See [@meng2018statistical] for a larger discussion
+of this topic.
 
-It follows from the above that the HTE for the population size is defined as 
-$\hat{N} = \sum_{i=1}^{n} \frac{1}{\pi_i}$. This holds true in the case where, 
-as here $\pi_i = \frac{n}{N}$, a bit trivial, but also in those where $\pi_i$ 
+It follows from the above that the HTE for the population size is defined as
+$\hat{N} = \sum_{i=1}^{n} \frac{1}{\pi_i}$. This holds true in the case where,
+as here $\pi_i = \frac{n}{N}$, a bit trivial, but also in those where $\pi_i$
 may be defined differently.
 
 ## Confidence Intervals
 
-The sampling distribution for the estimates --- typically sample means and sums 
---- across "repeated surveys" is Normal by the Central Limit Theorem, so the 
-typical $\bar{x} \pm 1.96 \sqrt{\frac{\sigma^2_X}{n}}$, expression is used to 
-calculate a 95% confidence interval. Lumley offers the following example from 
-the California Academic Performance Index (API) 
+The sampling distribution for the estimates --- typically sample means and sums
+--- across "repeated surveys" is Normal by the Central Limit Theorem, so the
+typical $\bar{x} \pm 1.96 \sqrt{\frac{\sigma^2_X}{n}}$, expression is used to
+calculate a 95% confidence interval. Lumley offers the following example from
+the California Academic Performance Index (API)
 [dataset](https://www.cde.ca.gov/re/pr/api.asp) to illustrate this idea.
 
 ```{r clt_demo, fig.width = 14, fig.height = 8, cache = TRUE}
@@ -373,32 +371,32 @@ p1 + p2
 ## Complex Sample Data in R
 
 What follows is a work-up of basic survey estimates using the California API
-dataset composed of student standardized test scores. I'll work through the 
-code once using the `survey` package and a second time using the `srvyr` 
-package, which has a [tidyverse](https://www.tidyverse.org/) friendly api.
+dataset composed of student standardized test scores. I'll work through the code
+once using the `survey` package and a second time using the `srvyr` package,
+which has a [tidyverse](https://www.tidyverse.org/) friendly api.
 
-Much of the computational work in this book begins with creating a design 
-object, from which weights and other information can then be drawn on for any 
+Much of the computational work in this book begins with creating a design
+object, from which weights and other information can then be drawn on for any
 number/type of estimates.
 
-For example, we create a basic design object below, where we look at a classic 
-simple random sample (SRS) of the schools in the API dataset. Let's take a 
-look at the dataset first.
+For example, we create a basic design object below, where we look at a classic
+simple random sample (SRS) of the schools in the API dataset. Let's take a look
+at the dataset first.
 
 ```{r apisrs_view}
 dplyr::as_tibble(apisrs)
 ```
 
-In the code below `fpc` stands for the aforementioned finite population 
-correction factor and `id=~1` designates the unit of analysis as each 
-individual row in the dataset.
+In the code below `fpc` stands for the aforementioned finite population
+correction factor and `id=~1` designates the unit of analysis as each individual
+row in the dataset.
 
 ```{r design_intro}
 srs_design <- svydesign(id = ~1, fpc = ~fpc, data = apisrs)
 srs_design
 ```
 
-In order to calculate the mean enrollment based on this sample the, 
+In order to calculate the mean enrollment based on this sample the,
 appropriately named, `svymean` function can be used.
 
 ```{r srs_svymean}
@@ -414,7 +412,7 @@ c(
 )
 ```
 
-Instead of specifying the finite population correction factor, the sampling 
+Instead of specifying the finite population correction factor, the sampling
 weights could be used - since this is a SRS, all the weights should be the same.
 
 ```{r srs_weights}
@@ -426,9 +424,9 @@ nofpc <- svydesign(id = ~1, weights = ~pw, data = apisrs)
 nofpc
 ```
 
-Use `svytotal` to calculate the estimate of the total across all schools, note 
-that the standard error will be different between the two designs because of 
-the lack of fpc.
+Use `svytotal` to calculate the estimate of the total across all schools, note
+that the standard error will be different between the two designs because of the
+lack of fpc.
 
 ```{r nofpc_svytotal}
 svytotal(~enroll, nofpc)
@@ -438,15 +436,15 @@ svytotal(~enroll, nofpc)
 svytotal(~enroll, srs_design)
 ```
 
-Totals across groups can be calculated using the `~` notation with a 
-categorical variable.
+Totals across groups can be calculated using the `~` notation with a categorical
+variable.
 
 ```{r total_cats}
 svytotal(~stype, srs_design)
 ```
 
-`svycontrast` can be used to calculate the difference or addition of two 
-different estimates - below we estimate the difference in the 2000 and 1999 
+`svycontrast` can be used to calculate the difference or addition of two
+different estimates - below we estimate the difference in the 2000 and 1999
 scores based on the SRS design.
 
 ```{r srs_contrast}
@@ -496,22 +494,22 @@ we can see that the sample contains this value in the confidence interval.
 
 ## Stratified Sampling
 
-Simple random samples are not often used in complex surveys because there is a 
-justified concern that some strata (e.g. racial ethnic group, age group, etc.) 
-may be underrepresented in the sample if a simple random sample were used. 
-Similarly, complex designs can give the same precision at a lower cost. 
-Consequently, a sample may be constructed so that some units are guaranteed to 
-be included within a given strata - improving the resulting variance. When 
-this is a simple random sample, the HTE and variance of the total population 
-is simply the sum of the strata specific estimates; 
-$HTE(X) = \sum_{s=1}^{S} T^{s}_X$, where there are $S$ strata within the 
+Simple random samples are not often used in complex surveys because there is a
+justified concern that some strata (e.g. racial ethnic group, age group, etc.)
+may be underrepresented in the sample if a simple random sample were used.
+Similarly, complex designs can give the same precision at a lower cost.
+Consequently, a sample may be constructed so that some units are guaranteed to
+be included within a given strata - improving the resulting variance. When this
+is a simple random sample, the HTE and variance of the total population is
+simply the sum of the strata specific estimates;
+$HTE(X) = \sum_{s=1}^{S} T^{s}_X$, where there are $S$ strata within the
 population.
 
-For example, in the `apistrat` data set a stratified random sample of 200 
+For example, in the `apistrat` data set a stratified random sample of 200
 schools is recorded such that schools are sampled randomly within school type (
 elementary, middle school or high school).
 
-In the code below we can designate the strata using the categorical variable 
+In the code below we can designate the strata using the categorical variable
 `stype`, which denotes each of the school type as strata.
 
 ```{r strat_design}
@@ -536,23 +534,23 @@ svymean(~enroll, strat_design)
 svytotal(~stype, strat_design)
 ```
 
-Note that are standard errors are 0 for the within strata estimates because if 
-we have strata information on each member of the population, then we know the 
+Note that are standard errors are 0 for the within strata estimates because if
+we have strata information on each member of the population, then we know the
 strata counts without any uncertainty.
 
 Several points worth noting about stratified samples before moving on.
 
--   Stratified samples get their power from "conditioning" on the strata 
-information that explain some of the variability in the measure.
+-   Stratified samples get their power from "conditioning" on the strata
+    information that explain some of the variability in the measure.
 
--   Whereas a SRS might have a chance of leaving out an elementary or middle 
-school, and leaving a higher estimate of enrollment, because of a higher 
-number of highschools in the sample, keeping a fixed number of samples within 
-each strata removes this problem.
+-   Whereas a SRS might have a chance of leaving out an elementary or middle
+    school, and leaving a higher estimate of enrollment, because of a higher
+    number of highschools in the sample, keeping a fixed number of samples
+    within each strata removes this problem.
 
 -   Stratified analysis may also refer to something entirely different from what
-we're discussing here --- where a subgroup has some model or estimate fit only 
-on that subgroup's data exclusively.
+    we're discussing here --- where a subgroup has some model or estimate fit
+    only on that subgroup's data exclusively.
 
 ### Now again with the `srvyr` package
 
@@ -582,14 +580,14 @@ srvyr_strat_design %>%
 
 ## Replicate Weights
 
-Replicate weights exploit sub-sampling to derive more generalizable statistics 
-than sampling weights. This is particularly useful when estimating a 
+Replicate weights exploit sub-sampling to derive more generalizable statistics
+than sampling weights. This is particularly useful when estimating a
 "nonparametric" statistic like the median or a quantile which doesn't have an
 easily derived variance.
 
-For a basic idea of why this works, Lumley notes that one could estimate the 
-variance of a total by using two independent half samples estimating the same 
-total, i.e. if $\hat{T}_A$ and $\hat{T}_B$ are both from two independent half 
+For a basic idea of why this works, Lumley notes that one could estimate the
+variance of a total by using two independent half samples estimating the same
+total, i.e. if $\hat{T}_A$ and $\hat{T}_B$ are both from two independent half
 samples estimating $\hat{T}$ then the variance of the difference of the two half
 samples is proportional to the variance of the original total:
 
@@ -597,56 +595,61 @@ $$
 E\left[ (\hat{T}_A - \hat{T}_B)^2 \right] = 2 V[\hat{T}_A] = 4 V[\hat{T}].
 $$
 
-There are multiple ways one might set up these splits that are more efficient 
-than the straightforward "half" sample described above - Lumley discusses 3 
+There are multiple ways one might set up these splits that are more efficient
+than the straightforward "half" sample described above - Lumley discusses 3
 variants briefly:
 
-1.  [Balanced Repeated Replication](https://en.wikipedia.org/wiki/Balanced_repeated_replication) (BRR)
-Based on the work of [@mccarthy1966replication].
+1.  [Balanced Repeated
+    Replication](https://en.wikipedia.org/wiki/Balanced_repeated_replication)
+    (BRR) Based on the work of [@mccarthy1966replication].
 
--   [@judkins1990fay], extends BRR to handle issues with sparse signals and 
-small samples.
+-   [@judkins1990fay], extends BRR to handle issues with sparse signals and
+    small samples.
 
 2.  [Jackknife](https://en.wikipedia.org/wiki/Jackknife_resampling)
 
--   Because BRR and Fay's method is difficult with other designs using 
-overlapping subsamples, Jackknife and the bootstrap are intended to be more 
-flexible.
+-   Because BRR and Fay's method is difficult with other designs using
+    overlapping subsamples, Jackknife and the bootstrap are intended to be more
+    flexible.
 
 3.  [Bootstrap](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))
 
 -   This is the method I'm most familiar with, outside of complex designs.
 -   Lumley states that using the Bootstrap in this setting involves taking a
-sample (with replacement) of observations or clusters and multiplying the 
-sampling weight by the number of times the observation appears in the sample.
+    sample (with replacement) of observations or clusters and multiplying the
+    sampling weight by the number of times the observation appears in the
+    sample.
 
-Each of these ideas relies on the fundamental idea that we can calculate the 
-variance of our statistic of interest by using --- sometimes carefully chosen 
---- subsamples of our original sample to calculate our statistic of interest 
-and more importantly, the variance of that statistic. Lumley's use of the 
-equation above gives the basic idea but I believe the more rigorous 
-justification appeals to theory involving [empiricial distribution functions](https://en.wikipedia.org/wiki/Empirical_distribution_function),
-as much of the theory underlying these ideas relies on getting a good estimate 
-of the empirical distribution.
+Each of these ideas relies on the fundamental idea that we can calculate the
+variance of our statistic of interest by using --- sometimes carefully chosen
+--- subsamples of our original sample to calculate our statistic of interest and
+more importantly, the variance of that statistic. Lumley's use of the equation
+above gives the basic idea but I believe the more rigorous justification appeals
+to theory involving [empiricial distribution
+functions](https://en.wikipedia.org/wiki/Empirical_distribution_function), as
+much of the theory underlying these ideas relies on getting a good estimate of
+the empirical distribution.
 
-It isn't explicitly clear which of these techniques is most popular currently, 
-but my guess would be that the bootstrap is the most used. This also happens to 
+It isn't explicitly clear which of these techniques is most popular currently,
+but my guess would be that the bootstrap is the most used. This also happens to
 be the method that Lumley has provided the most citations for in the text. I've
-also [run into](https://github.com/walkerke/tidycensus/issues/552) cases where 
-the US Census IPUMS data [uses](https://usa.ipums.org/usa/repwt.shtml#q50) 
-[successive difference weights](http://www.asasrms.org/Proceedings/y2011/Files/302108_67867.pdf).
+also [run into](https://github.com/walkerke/tidycensus/issues/552) cases where
+the US Census IPUMS data [uses](https://usa.ipums.org/usa/repwt.shtml#q50)
+[successive difference
+weights](http://www.asasrms.org/Proceedings/y2011/Files/302108_67867.pdf).
 
-All this to say that replicate weights are powerful for producing 
-"non-parametric" estimates, like quantiles and so on, and different weighting 
-techniques may be more or less appropriate depending on the design and data 
+All this to say that replicate weights are powerful for producing
+"non-parametric" estimates, like quantiles and so on, and different weighting
+techniques may be more or less appropriate depending on the design and data
 involved.
 
 ### Replicate Weights in R
 
-Lumley first demonstrates how to setup a survey design object when the weights 
-are already provided. I've had trouble accessing the 2005 California Health 
-Interview Survey [data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData.aspx) 
-on my own but he thankfully provides a link to the data on his 
+Lumley first demonstrates how to setup a survey design object when the weights
+are already provided. I've had trouble accessing the 2005 California Health
+Interview Survey
+[data](http://healthpolicy.ucla.edu/chis/data/Pages/GetCHISData.aspx) on my own
+but he thankfully provides a link to the data on his
 [website](https://r-survey.r-forge.r-project.org/svybook/).
 
 ```{r rep_weights_setup}
@@ -676,7 +679,8 @@ chis <- svrepdesign(
 chis
 ```
 
-When *creating* replicate weights in R one specifies a replicate type to the `type` argument.
+When *creating* replicate weights in R one specifies a replicate type to the
+`type` argument.
 
 ```{r bootstrap_design}
 boot_design <- as.svrepdesign(strat_design,
@@ -700,7 +704,14 @@ svymean(~enroll, boot_design)
 svymean(~enroll, jk_design)
 ```
 
-Of course, part of the motivation in using replicate weights is that you're able to estimate standard errors for non-trivial estimands, especially those that may not be implemented in the `survey` package. Lumley demonstrates this using a sample from the [National Wilms Tumor Study Cohort](https://pubmed.ncbi.nlm.nih.gov/18027087/), in order to estimate the five year survival probability via a [Kaplan-Meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator) Estimator.
+Of course, part of the motivation in using replicate weights is that you're able
+to estimate standard errors for non-trivial estimands, especially those that may
+not be implemented in the `survey` package. Lumley demonstrates this using a
+sample from the [National Wilms Tumor Study
+Cohort](https://pubmed.ncbi.nlm.nih.gov/18027087/), in order to estimate the
+five year survival probability via a
+[Kaplan-Meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator)
+Estimator.
 
 ```{r ntwsco_view}
 library(addhazard)
@@ -728,9 +739,15 @@ jkdes <- as.svrepdesign(des)
 withReplicates(jkdes, quote(fivesurv(trel, relaps, .weights)))
 ```
 
-The estimated five year survival probability of 84% (95% CI: 84%,85%) uses the `fivesurv` function which computes the kaplan meier estimate of five year survival probability fora given time status and weight. The `withReplicates` function then re-estimates this statistic using each set of replicates and calculates the standard error from the variability of these estimates.
+The estimated five year survival probability of 84% (95% CI: 84%,85%) uses the
+`fivesurv` function which computes the kaplan meier estimate of five year
+survival probability fora given time status and weight. The `withReplicates`
+function then re-estimates this statistic using each set of replicates and
+calculates the standard error from the variability of these estimates.
 
-Its worth noting that this is the standard error for estimating the five year survival in the NWTS cohort, not the hypothetical superpopulation of all children with Wilms' tumor.
+Its worth noting that this is the standard error for estimating the five year
+survival in the NWTS cohort, not the hypothetical superpopulation of all
+children with Wilms' tumor.
 
 ### Now again with the `srvyr` package
 
@@ -746,44 +763,45 @@ boot_design
 boot_design %>% summarise(Mean = survey_mean(enroll))
 ```
 
-It's not clear or straightforward to me from reading the `srvyr` 
-[docs](http://gdfe.co/srvyr/articles/extending-srvyr.html) how to estimate the 
+It's not clear or straightforward to me from reading the `srvyr`
+[docs](http://gdfe.co/srvyr/articles/extending-srvyr.html) how to estimate the
 weighted survival function probability --- I may return to this later.
 
 ### Final Notes on Replicate Weights
 
-Lumley finishes this section by noting that the bootstrap typically works 
-better when all the strata are large. While a strata correction is available 
-it is likely not correct for small or unequal strata.
+Lumley finishes this section by noting that the bootstrap typically works better
+when all the strata are large. While a strata correction is available it is
+likely not correct for small or unequal strata.
 
-Separately, Lumley note that both the jackknife and bootstrap can incorporate 
+Separately, Lumley note that both the jackknife and bootstrap can incorporate
 finite population correction factors.
 
-Finally, the BRR designs implemented in the `survey` package will use at most 
-excess 4 replicate splits for $K < 180$ and at most 5% when $K > 100$. It is 
-not clear to me from the reading, which is more likely to be used for 
+Finally, the BRR designs implemented in the `survey` package will use at most
+excess 4 replicate splits for $K < 180$ and at most 5% when $K > 100$. It is not
+clear to me from the reading, which is more likely to be used for
 $100 < K < 180$.
 
 ## Other population summaries
 
-While population means, totals, and differences are typically easy to estimate 
-via the horvitz thompson estimator there are other population statistics such 
-as the median or regression estimates that are more complex. These require 
-using the replicate weights described in the previous 
-[section](#Replicate%20Weights) or making certain linearization / interpolation
-assumptions which may or may not influence the resulting estimate.
+While population means, totals, and differences are typically easy to estimate
+via the horvitz thompson estimator there are other population statistics such as
+the median or regression estimates that are more complex. These require using
+the replicate weights described in the previous [section](#Replicate%20Weights)
+or making certain linearization / interpolation assumptions which may or may not
+influence the resulting estimate.
 
 ### Quantiles
 
 Estimation of quantiles involves estimating arbitary points along the
-[cumulative distribution function](https://en.wikipedia.org/wiki/Cumulative_distribution_function)(cdf).
-For example, the 90th percentile has 90% of the estimated population size 
-below it and 10% above. In this case, for cdf $F_X(x)$, we want to estimate 
-$x: F_X(x) = 0.9$. However, estimating the cdf presents some technical 
-difficulties in that the 
-[empirical cumulative distribution function](https://en.wikipedia.org/wiki/Empirical_distribution_function)
-(ecdf), is not typically a "smooth" estimate for any given $x$ --- as the 
-estimate is highly dependent upon the sample. Consequently, Lumley's function, 
+[cumulative distribution
+function](https://en.wikipedia.org/wiki/Cumulative_distribution_function)(cdf).
+For example, the 90th percentile has 90% of the estimated population size below
+it and 10% above. In this case, for cdf $F_X(x)$, we want to estimate
+$x: F_X(x) = 0.9$. However, estimating the cdf presents some technical
+difficulties in that the [empirical cumulative distribution
+function](https://en.wikipedia.org/wiki/Empirical_distribution_function) (ecdf),
+is not typically a "smooth" estimate for any given $x$ --- as the estimate is
+highly dependent upon the sample. Consequently, Lumley's function,
 `svyquantile()` interpolates linearly between two adjacent observations when the
 quantile is not uniquely defined.
 
@@ -792,19 +810,19 @@ samp <- rnorm(20)
 plot(ecdf(samp))
 ```
 
-Confidence intervals are constructed similarly, using the ecdf, though it 
-should be noted that estimating extreme quantiles poses difficulties because of
-the low density values in the area.
+Confidence intervals are constructed similarly, using the ecdf, though it should
+be noted that estimating extreme quantiles poses difficulties because of the low
+density values in the area.
 
-A first calculation to demonstrate this using replicate weights with the CA 
+A first calculation to demonstrate this using replicate weights with the CA
 health interview study, estimating different quantiles of BMI.
 
 ```{r quantile_rep_estimate}
 svyquantile(~bmi_p, design = chis, quantiles = c(0.25, 0.5, 0.75))
 ```
 
-The same thing can be done with the stratified design. Here the uncertainty is 
-computed via the estimates of the ecdf and finding the pointwise confidence 
+The same thing can be done with the stratified design. Here the uncertainty is
+computed via the estimates of the ecdf and finding the pointwise confidence
 interval for different points along the curve.
 
 ```{r quantile_wt_estimate}
@@ -823,33 +841,33 @@ srvyr_strat_design %>%
 
 ### Contingency Tables
 
-Lumley's main points in this section focus on the complications in 
-interpretation of typical contingency table tests of association in a design 
-based setting. Specifically, he points out that it is not obvious how the null 
-distribution should be generated without making some kind of modeling 
+Lumley's main points in this section focus on the complications in
+interpretation of typical contingency table tests of association in a design
+based setting. Specifically, he points out that it is not obvious how the null
+distribution should be generated without making some kind of modeling
 assumptions. Quoting from the book (text in parentheses from me):
 
-> For example, if there are 56,181,887 women and 62,710,561 men in a population 
-it is not possible for the proportions of men and women who are unemployed to be
-the same, since these population sizes have no common factors. We would know 
-without collecting any employment data that the finite-population null 
-hypothesis (of equal proportions) was false. A more interesting question is 
-whether the finite population could have arisen from a process that had no 
-association between the variables: is the difference at the population level 
-small enough to have arisen by chance.... A simpler approach is to treat the 
-sample as if it came from an infinite superpopulation and simply ignore the 
-finite-population corrections in inference.
+> For example, if there are 56,181,887 women and 62,710,561 men in a population
+> it is not possible for the proportions of men and women who are unemployed to
+> be the same, since these population sizes have no common factors. We would
+> know without collecting any employment data that the finite-population null
+> hypothesis (of equal proportions) was false. A more interesting question is
+> whether the finite population could have arisen from a process that had no
+> association between the variables: is the difference at the population level
+> small enough to have arisen by chance.... A simpler approach is to treat the
+> sample as if it came from an infinite superpopulation and simply ignore the
+> finite-population corrections in inference.
 
-The super-population approach offers the more interesting approach 
+The super-population approach offers the more interesting approach
 philosophically and thus is implemented in the `survey` package. The `svychisq`
-function implements a test for no association as the null using a chi-squared 
-distribution with a correction for the mean and variance. Lumley's writing 
-isn't quite clear here, but it sounds like two methods for this approach are 
-implemented but one is not used because of its performance in small samples, 
-and takes a long time for very small p-values. This appears to be a case where 
-one has to hope the default approach is generally appropriate.
+function implements a test for no association as the null using a chi-squared
+distribution with a correction for the mean and variance. Lumley's writing isn't
+quite clear here, but it sounds like two methods for this approach are
+implemented but one is not used because of its performance in small samples, and
+takes a long time for very small p-values. This appears to be a case where one
+has to hope the default approach is generally appropriate.
 
-Lumley demonstrates how to call these functions estimating smoking use by 
+Lumley demonstrates how to call these functions estimating smoking use by
 insurance status from the California Health Interview Survey.
 
 ```{r, eval = FALSE}
@@ -866,23 +884,23 @@ ftab <- ftable(tab, rownames = list(
 
 ### Estimates in Subpopulations
 
-Estimation within subpopulations (also called domain estimation) that are 
-sampled strata is easy since a stratified sample is composed of random samples 
-within strata by definition; simply compute the desired statistic within the 
+Estimation within subpopulations (also called domain estimation) that are
+sampled strata is easy since a stratified sample is composed of random samples
+within strata by definition; simply compute the desired statistic within the
 given strata using the strata-specific random sample.
 
-When the subpopulation of interest is not a strata, things are more difficult. 
-While the sampling weights would still be correct for representing any given 
-observation to the total population --- resulting in an unbiased mean point 
-estimate --- the co-occurrence probabilities $\pi_{i,j}$ would be incorrect, 
-because the co-occurrence probabilities are now unknown/random and not fixed 
-by design. Lumley doesn't go into too much detail on how this addressed 
-(even in the Appendix) but my reading is that he calculates the co-occurrence 
-probabilities through a form of empirical distribution/replicate weighting. 
-Examples below demonstrating this idea estimate the number of teachers with 
+When the subpopulation of interest is not a strata, things are more difficult.
+While the sampling weights would still be correct for representing any given
+observation to the total population --- resulting in an unbiased mean point
+estimate --- the co-occurrence probabilities $\pi_{i,j}$ would be incorrect,
+because the co-occurrence probabilities are now unknown/random and not fixed by
+design. Lumley doesn't go into too much detail on how this addressed (even in
+the Appendix) but my reading is that he calculates the co-occurrence
+probabilities through a form of empirical distribution/replicate weighting.
+Examples below demonstrating this idea estimate the number of teachers with
 emergency, `emer`, training amongst California schools using the `api` dataset.
 
-TODO(apeterson91): Add more on the ratio estimation technique used here to 
+TODO(apeterson91): Add more on the ratio estimation technique used here to
 estimate subpopulation uncertainty.
 
 ```{r subpop_1}
@@ -903,7 +921,8 @@ svytotal(~enroll, emerg_high)
 svytotal(~enroll, emerg_low)
 ```
 
-In general, if replicate weights are available, domain estimation is much easier.
+In general, if replicate weights are available, domain estimation is much
+easier.
 
 ```{r subpop_5_rwts}
 bys <- svyby(~bmi_p, ~ srsex + racehpr, svymean, design = chis, keep.names = FALSE)
@@ -931,31 +950,33 @@ medians
 
 ## Design of Stratified Samples
 
-How to pick the sample size for each strata? Well it depends on the goals of 
-the analysis. If the goal is to estimate a total across the whole population, 
-the formula for the variance of a total can be used to gain insights about 
-optimal allocation. Since the variance of the total is dependent (via sum) of the strata specific variances, more sample size would want to be dedicated to more heterogeneous and/or larger strata.
+How to pick the sample size for each strata? Well it depends on the goals of the
+analysis. If the goal is to estimate a total across the whole population, the
+formula for the variance of a total can be used to gain insights about optimal
+allocation. Since the variance of the total is dependent (via sum) of the strata
+specific variances, more sample size would want to be dedicated to more
+heterogeneous and/or larger strata.
 
 This general approach means that the sample size for strata $k$, $n_k$ should be
-proportional to the population strata size $N_k$ and strata variance 
-$\sigma^{2}_k$, $n_k \propto \sqrt{N^2_k \sigma^2_k} = N_k \sigma_k$. Lumley 
+proportional to the population strata size $N_k$ and strata variance
+$\sigma^{2}_k$, $n_k \propto \sqrt{N^2_k \sigma^2_k} = N_k \sigma_k$. Lumley
 notes that while this expression satisfies some theoretical optimality criteria,
-it is often the case that different strata have different costs associated with 
-their sampling and so the expression can be modified in order to take into 
+it is often the case that different strata have different costs associated with
+their sampling and so the expression can be modified in order to take into
 account this cost as follows:
 
 $$
 n_k \propto \frac{ N_k \sigma_k}{\sqrt{\text{cost}_k}},
-$$ 
+$$
 
 where cost$_k$ is the cost of sampling for strata $k$.
-
 
 ### Demo: Stratified Samples
 
 From our previous example, using the `school_data` we can estimate a stratified
 sample by using `slice_sample()` again but putting a `group_by()` statement
 beforehand to specify the strata, or groups within which we'd like a sample.
+
 ```{r}
 school_data %>%
   group_by(class_id) %>%
@@ -966,57 +987,57 @@ school_data %>%
   )
 ```
 
-Note the increased precision compared to our prior estimate. The increased 
+Note the increased precision compared to our prior estimate. The increased
 precision comes from the strata information.
 
 ## Questions
 
-1.You are conducting a survey of emergency preparedness at a large HMO, where 
-you want to estimate what proportion of medical staff would be able to get to 
+1.You are conducting a survey of emergency preparedness at a large HMO, where
+you want to estimate what proportion of medical staff would be able to get to
 work after an earthquake.
 
-  a.) You can either send out a single questionnaire to all staff, or send out 
-  a questionnaire to about 10% of the staff and make follow-up phone calls for 
-  those that don't respond. What are the disadvantages of each approach?
+a.) You can either send out a single questionnaire to all staff, or send out a
+questionnaire to about 10% of the staff and make follow-up phone calls for those
+that don't respond. What are the disadvantages of each approach?
 
-This comes down to a discussion of cost for sampling and what missing data 
-mechanism may be at play. As a simple starting point, if we were to assume the 
-resulting data were MCAR and the non response rate was equivalent between both 
-sampling strategies, the single questionnaire would be preferred because it 
-would result in a higher overall sample size. These assumptions are probably 
-not likely however, and we may expect that non-response is associated with 
-other meaningful factors, by choosing a the follow-up phone call we might 
-minimize non-response to both reduce bias and improve precision.
+This comes down to a discussion of cost for sampling and what missing data
+mechanism may be at play. As a simple starting point, if we were to assume the
+resulting data were MCAR and the non response rate was equivalent between both
+sampling strategies, the single questionnaire would be preferred because it
+would result in a higher overall sample size. These assumptions are probably not
+likely however, and we may expect that non-response is associated with other
+meaningful factors, by choosing a the follow-up phone call we might minimize
+non-response to both reduce bias and improve precision.
 
-Additional relevant concerns would be the possible response or lack of 
-response of certain strata --- certain physicians, technicians or other kinds 
-of staff's response would likely be worth knowing yet these groups may be less 
-well represented in a 10% simple random sample of the population.
+Additional relevant concerns would be the possible response or lack of response
+of certain strata --- certain physicians, technicians or other kinds of staff's
+response would likely be worth knowing yet these groups may be less well
+represented in a 10% simple random sample of the population.
 
-b.) You choose to survey just a sample. What would be useful variables to 
+b.) You choose to survey just a sample. What would be useful variables to
 stratify the sampling, and why?
 
-The aforementioned job title would be useful to stratify on. This would likely 
-be most useful to conduct within each department. Further, if the HMO has more 
-than one site or clinic, that would be worth stratifying on as well for 
+The aforementioned job title would be useful to stratify on. This would likely
+be most useful to conduct within each department. Further, if the HMO has more
+than one site or clinic, that would be worth stratifying on as well for
 substantive reasons just as much as statistical reasons.
 
-c.) The survey was conducted with just two strata: physicians and other staff. 
-The HMO has 900 physicians and 9000 other staff. You sample 450 physicians and 
+c.) The survey was conducted with just two strata: physicians and other staff.
+The HMO has 900 physicians and 9000 other staff. You sample 450 physicians and
 450 other staff. What are the sampling probabilities in each stratum?
 
-physician strata sampling probabilities are 
-$\frac{n}{N_k} = \frac{450}{900} = \frac{1}{2}$, while the "other staff" 
+physician strata sampling probabilities are
+$\frac{n}{N_k} = \frac{450}{900} = \frac{1}{2}$, while the "other staff"
 probabilities are $\frac{450}{9000} = \frac{1}{20}$
 
-d.) 300 physicians and 150 other staff say they would be able to get to work 
-after an earthquake. Give unbiased estimates of the proportion in each stratum 
+d.) 300 physicians and 150 other staff say they would be able to get to work
+after an earthquake. Give unbiased estimates of the proportion in each stratum
 and the total proportion.
 
-The physician strata estimate would be $\frac{300}{450} = \frac{2}{3}$. The 
-staff strata would be $\frac{150}{450} = \frac{1}{3}$ The total proportion 
-would be $\frac{2 \times 300 + 20 \times 150}{9900}$. This value can be 
-recreated below with the `survey` package as follows.
+The physician strata estimate would be $\frac{300}{450} = \frac{2}{3}$. The
+staff strata would be $\frac{150}{450} = \frac{1}{3}$ The total proportion would
+be $\frac{2 \times 300 + 20 \times 150}{9900}$. This value can be recreated
+below with the `survey` package as follows.
 
 ```{r strata_q_setup}
 df <- tibble(
@@ -1033,80 +1054,79 @@ hmo_design
 svymean(~prep, hmo_design)
 ```
 
-e.) How would you explain to the managers that commissioned the study how the 
-estimate was computed and why it wasn't just the number who said "yes" divided 
+e.) How would you explain to the managers that commissioned the study how the
+estimate was computed and why it wasn't just the number who said "yes" divided
 by the total number surveyed?
 
-We sampled from the total population using the strata because we though these 
-two groups would respond differently and indeed, they did. Physicians have are 
-twice as likely to be able to make it to the hospital in the event of an 
-emergency as general staff. However, physicians make up a much smaller 
-proportion of the overall hospital workforce and so we need to downweight 
-their responses, relative to general staff in order to ensure their response 
-reflects their distribution in the total population, thus the total estimate 
-of the HMO's emergency preparedness is much closer to the "general" staff's 
-strata estimate of $\frac{1}{3}$.
+We sampled from the total population using the strata because we though these
+two groups would respond differently and indeed, they did. Physicians have are
+twice as likely to be able to make it to the hospital in the event of an
+emergency as general staff. However, physicians make up a much smaller
+proportion of the overall hospital workforce and so we need to downweight their
+responses, relative to general staff in order to ensure their response reflects
+their distribution in the total population, thus the total estimate of the HMO's
+emergency preparedness is much closer to the "general" staff's strata estimate
+of $\frac{1}{3}$.
 
-2.You are conducting a survey of commuting time and means of transport for a 
-large university. What variables are likely to be available and useful for 
+2.You are conducting a survey of commuting time and means of transport for a
+large university. What variables are likely to be available and useful for
 stratifying the sampling?
 
-Probably worth stratifying on "role" at university --- student vs. staff vs. 
-professor. Each of these have varying amounts of income available and would 
-likely determine their different means and, consequently, commute time of 
-getting to campus. It might also be worth stratifying on the department of 
-employment for staff and professors, as there can be a wide variability in 
-these measures, again, by department.
+Probably worth stratifying on "role" at university --- student vs. staff vs.
+professor. Each of these have varying amounts of income available and would
+likely determine their different means and, consequently, commute time of
+getting to campus. It might also be worth stratifying on the department of
+employment for staff and professors, as there can be a wide variability in these
+measures, again, by department.
 
 3.-4. Skip because of CHIS data issues
 
-5.  In the Academic Performance Index data we saw large gains in precision 
-from stratification on school type when estimating mean or total school size, 
-and no gain when estimating mean Academic performance Index. Would you expect 
-a large or small gain from the following variables: `mobility`, `emer`, 
-`meals`, `pcttest`? Compare your expectations with the actual results.
+5.  In the Academic Performance Index data we saw large gains in precision from
+    stratification on school type when estimating mean or total school size, and
+    no gain when estimating mean Academic performance Index. Would you expect a
+    large or small gain from the following variables: `mobility`, `emer`,
+    `meals`, `pcttest`? Compare your expectations with the actual results.
 
 The general principle here, is which of these variables do we expect to have
 some association with the school type. The greater association the more the
-benefit from stratifying. 
+benefit from stratifying.
 
 ```{r}
-
 ```
 
-6.  For estimating total school enrollment in the Academic Performance Index 
-population, what is the optimal allocation of a total sample size of 200 
-stratified by school size? Draw a sample with this optimal allocation and 
-compare the standard errors to the stratified sample in Figure 2.5 for: total 
-enrollment, mean 2000 API, mean `meals`, mean `ell`.
+6.  For estimating total school enrollment in the Academic Performance Index
+    population, what is the optimal allocation of a total sample size of 200
+    stratified by school size? Draw a sample with this optimal allocation and
+    compare the standard errors to the stratified sample in Figure 2.5 for:
+    total enrollment, mean 2000 API, mean `meals`, mean `ell`.
 
-7.  Figure 2.1 shows that the mean school size (enroll) in simple random 
-samples of size 200 from the Academic Performance Index population has close 
-to a Normal distribution.
+7.  Figure 2.1 shows that the mean school size (enroll) in simple random samples
+    of size 200 from the Academic Performance Index population has close to a
+    Normal distribution.
 
 <!-- -->
 
 a)  Construct similar graphs for SRS of size 200, 50, 25, 10.
 b)  Repeat for median school size.
-c)  Repeat for mean school size in stratified samples of size 100, 52, 24, 12 
-using the same stratification proportions (50% elementary, 25% middle schools, 
-25% high schools) as in the built-in stratified sample.
+c)  Repeat for mean school size in stratified samples of size 100, 52, 24, 12
+    using the same stratification proportions (50% elementary, 25% middle
+    schools, 25% high schools) as in the built-in stratified sample.
 
 <!-- -->
 
-8.  In a design with just two strata write the sample sizes as $n_1$ and 
-$n-n_1$ so that there is only one quantity that can be varied. Differentiate 
-the variance of the total with respect to $n_1$ to find the optimal allocation 
-for two strata. Extend this to any number of strata by using the fact that an 
-optimal allocation cannot be improved by moving samples from one stratum to 
-another stratum.
+8.  In a design with just two strata write the sample sizes as $n_1$ and $n-n_1$
+    so that there is only one quantity that can be varied. Differentiate the
+    variance of the total with respect to $n_1$ to find the optimal allocation
+    for two strata. Extend this to any number of strata by using the fact that
+    an optimal allocation cannot be improved by moving samples from one stratum
+    to another stratum.
 
-9.  Write an R function that takes inputs 
-$n_1, n_2, N_1, N_2, \sigma^2_1, \sigma^2_2$ and computes the variance of the 
-population total in a stratified sample. Choose some reasonable values of the 
-population sizes and variances, and graph this function as $n_1$ and $n_2$ 
-change, to find the optimum and to examine how sensitive the variance is the 
-precise values of $n_1$ and $n_2$.
+9.  Write an R function that takes inputs
+    $n_1, n_2, N_1, N_2, \sigma^2_1, \sigma^2_2$ and computes the variance of
+    the population total in a stratified sample. Choose some reasonable values
+    of the population sizes and variances, and graph this function as $n_1$ and
+    $n_2$ change, to find the optimum and to examine how sensitive the variance
+    is the precise values of $n_1$ and $n_2$.
 
 10. Verify that equation 2.2 gives the HTE of variance for a SRS
 
@@ -1120,35 +1140,35 @@ b)  Compute $\pi_{ij} - \pi_i \pi_j$
 
 c)  Show that the equation in exercise 1.10 (c) reduces to equation 2.2
 
-d)  Suppose instead each individual in the population is independently sampled 
-with probability $\frac{n}{N}$, so that the sample size $n$ is *not* fixed. 
-Show that the finite population correction disappears from equation 2.2 for 
-this *Bernoulli sampling* design.
+d)  Suppose instead each individual in the population is independently sampled
+    with probability $\frac{n}{N}$, so that the sample size $n$ is *not* fixed.
+    Show that the finite population correction disappears from equation 2.2 for
+    this *Bernoulli sampling* design.
 
 # Chapter 3: Cluster Sampling
 
 ## Why Clusters? The NHANES design
 
-Why sample clusters? Because sometimes it's easier than sampling individuals. 
-Specifically, in cases where the *cost* of sampling individuals can be quite 
-high, sampling clusters can be more efficient. This is in spite of the fact 
-that within cluster correlation tends to be positive, reducing the information 
-in the sample. Lumley uses the NHANES survey to motivate this idea: moving 
-mobile examination centers all across the country to sample individuals is 
-extremely expensive. By sampling a large number of individuals within a census 
-tract aggregation area the NHANES survey is able to reduce the cost of their 
-effort at a reasonable expense in precision.
+Why sample clusters? Because sometimes it's easier than sampling individuals.
+Specifically, in cases where the *cost* of sampling individuals can be quite
+high, sampling clusters can be more efficient. This is in spite of the fact that
+within cluster correlation tends to be positive, reducing the information in the
+sample. Lumley uses the NHANES survey to motivate this idea: moving mobile
+examination centers all across the country to sample individuals is extremely
+expensive. By sampling a large number of individuals within a census tract
+aggregation area the NHANES survey is able to reduce the cost of their effort at
+a reasonable expense in precision.
 
 ### Single-stage and multistage designs
 
-Depending on the type of clusters involved it can be easy to sample the entire 
-cluster as classrooms, medical practice and workplaces are, however it is more 
-likely that some subsampling within clusters will be performed for the sake of 
-efficiency. As Lumley notes, clusters in the first stage are called 
-*Primary Sampling Units* or PSUs. "Stages" refer to the different levels at 
-which sampling occurs. E.g. Sampling individuals within sampled census tracts 
-within a state would involve sampling census tracts in the first stage and 
-then individuals in the second stage. The diagram below communicates this idea 
+Depending on the type of clusters involved it can be easy to sample the entire
+cluster as classrooms, medical practice and workplaces are, however it is more
+likely that some subsampling within clusters will be performed for the sake of
+efficiency. As Lumley notes, clusters in the first stage are called *Primary
+Sampling Units* or PSUs. "Stages" refer to the different levels at which
+sampling occurs. E.g. Sampling individuals within sampled census tracts within a
+state would involve sampling census tracts in the first stage and then
+individuals in the second stage. The diagram below communicates this idea
 graphically.
 
 ```{r, echo = FALSE}
@@ -1173,21 +1193,47 @@ b -> {c}
 }")
 ```
 
-Sampling weights are determined assuming independence across stages --- e.g. 
-if a cluster of houses is sampled with probability $\pi_1$ and a household is 
-sampled within that cluster with probability $\pi_2$ then the sampling probability for that house is $\pi = \pi_1 \times \pi_2$ and it's weight is the inverse of that probability. Note that this requires that clusters be mutually exclusive - a sampled unit can belong only to one cluster and no others. Further, note that we can still have biased sampling *within* a stage, as independence is only required across stages to use to find probabilities via their product.
+Sampling weights are determined assuming independence across stages --- e.g. if
+a cluster of houses is sampled with probability $\pi_1$ and a household is
+sampled within that cluster with probability $\pi_2$ then the sampling
+probability for that house is $\pi = \pi_1 \times \pi_2$ and it's weight is the
+inverse of that probability. Note that this requires that clusters be mutually
+exclusive - a sampled unit can belong only to one cluster and no others.
+Further, note that we can still have biased sampling *within* a stage, as
+independence is only required across stages to use to find probabilities via
+their product.
 
-Lumley goes on to describe how cluster sampling and individual sampling can be mixed since each stratum of a survey can be thought of as a separate and independent sample it is trivial to combine single stage sampling in one stratum and multistage sampling in another; a stratified random sample can be used in high density regions where measurement of multiple units is less costly and a cluster sample can be taken in low density regions where the cost of each additional unit is more costly.
+Lumley goes on to describe how cluster sampling and individual sampling can be
+mixed since each stratum of a survey can be thought of as a separate and
+independent sample it is trivial to combine single stage sampling in one stratum
+and multistage sampling in another; a stratified random sample can be used in
+high density regions where measurement of multiple units is less costly and a
+cluster sample can be taken in low density regions where the cost of each
+additional unit is more costly.
 
-The statistical rationale behind this strategy is fairly straightforward --- since the variance of the sum is the sum of the variances of each stage (assuming independence) each sampled cluster in a multistage sample can be considered as a population for further sampling. Lumley uses the example of a simplified NHANES design, where 64 regions are grouped into 32 strata. A simple random sample of 440 individuals are then measured in each region. In Lumley's words,
+The statistical rationale behind this strategy is fairly straightforward ---
+since the variance of the sum is the sum of the variances of each stage
+(assuming independence) each sampled cluster in a multistage sample can be
+considered as a population for further sampling. Lumley uses the example of a
+simplified NHANES design, where 64 regions are grouped into 32 strata. A simple
+random sample of 440 individuals are then measured in each region. In Lumley's
+words,
 
-> The variance of an estimated total from this design can be partitioned across two sources: the variance of each estimated regional total around the true total of the region and the variance that would result if the true total for each of the 64 sampled regions were known exactly.
+> The variance of an estimated total from this design can be partitioned across
+> two sources: the variance of each estimated regional total around the true
+> total of the region and the variance that would result if the true total for
+> each of the 64 sampled regions were known exactly.
 
-In my own words and understanding, I understand there to be variance that comes from grouping the 64 regions into 32 strata --- so there is uncertainty across region and then the uncertainty within that region that results from the sample of *only* a subset of the population.
+In my own words and understanding, I understand there to be variance that comes
+from grouping the 64 regions into 32 strata --- so there is uncertainty across
+region and then the uncertainty within that region that results from the sample
+of *only* a subset of the population.
 
 ## Describing Multi Stage Designs to R
 
-In order to specify a single stage cluster sample or a multistage sample treated as a single stage sample with replacement, the main difference is that the PSU identifier needs to be supplied to the `id` argument, as follows.
+In order to specify a single stage cluster sample or a multistage sample treated
+as a single stage sample with replacement, the main difference is that the PSU
+identifier needs to be supplied to the `id` argument, as follows.
 
 ```{r nhanes3_data, eval = FALSE}
 # Data originally found at
@@ -1210,9 +1256,14 @@ svydesign(
 )
 ```
 
-SDPPSU6 is the pseudo PSU variable, and SDPSTRA6 is the stratum identifier defined for the single stage analysis.
+SDPPSU6 is the pseudo PSU variable, and SDPSTRA6 is the stratum identifier
+defined for the single stage analysis.
 
-For example, a two stage design for the API population that samples 40 school districts, then five schools within each district , the design has population size 757 at the first stage for the number of school districts in CA and the number of schools within each district for the second stage. The weights need not be supplied if they can be worked out from the other arguments.
+For example, a two stage design for the API population that samples 40 school
+districts, then five schools within each district , the design has population
+size 757 at the first stage for the number of school districts in CA and the
+number of schools within each district for the second stage. The weights need
+not be supplied if they can be worked out from the other arguments.
 
 ```{r}
 data(api)
@@ -1230,17 +1281,37 @@ clus2_design
 
 ## Strata with only one PSU
 
-When only one PSU exists within a population stratum, the sampling fraction *must* be 100%, since otherwise it would be 0%. In this case, the stratum does not contribute to the first stage variance and it should be ignored in calculating the first stage variance. Lumley argues that the best way to handle a stratum with only one PSU is to combine it with another stratum, one that is chosen to be similar based on *population* data available before the study was done. The `survey` package has two different methods implemented to handle "lonely" PSU's. Lumley has written further on this topic [here](http://r-survey.r-forge.r-project.org/survey/exmample-lonely.html).
+When only one PSU exists within a population stratum, the sampling fraction
+*must* be 100%, since otherwise it would be 0%. In this case, the stratum does
+not contribute to the first stage variance and it should be ignored in
+calculating the first stage variance. Lumley argues that the best way to handle
+a stratum with only one PSU is to combine it with another stratum, one that is
+chosen to be similar based on *population* data available before the study was
+done. The `survey` package has two different methods implemented to handle
+"lonely" PSU's. Lumley has written further on this topic
+[here](http://r-survey.r-forge.r-project.org/survey/exmample-lonely.html).
 
 ## How good is the single-stage approximation?
 
-Here Lumley walks through an example detailing the trade-offs involved in using the single stage approximation. I'll try to come up with a simulated example later as the data is not listed on the book's [website](https://r-survey.r-forge.r-project.org/svybook/) nor is it clear how to reassemble his dataset from the files at the [NHIS site](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Datasets/NHIS/1992/).
+Here Lumley walks through an example detailing the trade-offs involved in using
+the single stage approximation. I'll try to come up with a simulated example
+later as the data is not listed on the book's
+[website](https://r-survey.r-forge.r-project.org/svybook/) nor is it clear how
+to reassemble his dataset from the files at the [NHIS
+site](https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Datasets/NHIS/1992/).
 
 ## Sampling by Size
 
-> Why do white sheep eat more than black sheep? There are more white sheep than black sheep
+> Why do white sheep eat more than black sheep? There are more white sheep than
+> black sheep
 
-A specific design theory, *Probability-proportional-to-size* (PPS), cluster sampling is a sampling strategy that exploits the fact that for a simple random sample of an unstratified population $\pi_i$ can be chosen such that it is approximately proportional to $X_i$, the variable of interest, the variance of the estimate of the total $V[\hat{T}] = \frac{N-n}{N} N^{2} \frac{V[X]}{n}$ can be controlled to be quite small. [@tille2006sampling; @hanif1980sampling] discuss these ideas further.
+A specific design theory, *Probability-proportional-to-size* (PPS), cluster
+sampling is a sampling strategy that exploits the fact that for a simple random
+sample of an unstratified population $\pi_i$ can be chosen such that it is
+approximately proportional to $X_i$, the variable of interest, the variance of
+the estimate of the total $V[\hat{T}] = \frac{N-n}{N} N^{2} \frac{V[X]}{n}$ can
+be controlled to be quite small. [@tille2006sampling; @hanif1980sampling]
+discuss these ideas further.
 
 ```{r}
 data(election)
@@ -1259,7 +1330,9 @@ election %>%
   )
 ```
 
-When Lumley's book was written, only the single stage approximation of PPS could be analyzed using the `survey` package. A demo is shown below using the voting data, where a PPS sample is constructed and then analyzed.
+When Lumley's book was written, only the single stage approximation of PPS could
+be analyzed using the `survey` package. A demo is shown below using the voting
+data, where a PPS sample is constructed and then analyzed.
 
 ```{r}
 data(election)
@@ -1283,9 +1356,11 @@ svytotal(~ Bush + Kerry + Nader, pps_design, deff = TRUE)
 
 ## Loss of information from sampling clusters
 
-The loss of precision per observation from cluster sampling is given by the design effect.
+The loss of precision per observation from cluster sampling is given by the
+design effect.
 
-> "For a single-stage cluster sample with all clusters having the same number of individuals, $m$, the design effect is
+> "For a single-stage cluster sample with all clusters having the same number of
+> individuals, $m$, the design effect is
 
 $$
 DEff = 1 + (m-1)\rho,
@@ -1293,22 +1368,34 @@ $$
 
 > where $\rho$ is the within-cluster correlation.
 
-Lumley illustrates how design effects can illustrate the impact on inference using the California school data set from before as well as the Behavioral Risk Factor Surveillance System from 2007.
+Lumley illustrates how design effects can illustrate the impact on inference
+using the California school data set from before as well as the Behavioral Risk
+Factor Surveillance System from 2007.
 
 ```{r}
 svymean(~ api00 + meals + ell + enroll, clus1_design, deff = TRUE)
 ```
 
-In the above, the variance is up to 10 times higher in the cluster sample as compared to a simple random sample.
+In the above, the variance is up to 10 times higher in the cluster sample as
+compared to a simple random sample.
 
 ```{r}
 ## Lumley renames clus2_design to dclus2 from before. I maintain the same names.
 svymean(~ api00 + meals + ell + enroll, clus2_design, deff = TRUE, na.rm = TRUE)
 ```
 
-These values increase slightly for all measures except `api00` in the two stage cluster sampling design. Lumley points out that these large design effects demonstrate how variable the measures of interest are between cluster, suggesting that the sampling of clusters, while efficient economically are not as efficient statistically.
+These values increase slightly for all measures except `api00` in the two stage
+cluster sampling design. Lumley points out that these large design effects
+demonstrate how variable the measures of interest are between cluster,
+suggesting that the sampling of clusters, while efficient economically are not
+as efficient statistically.
 
-Similarly, when computing the proportion of individuals who have more than 5 servings of fruits and vegetables a day (X_FV5SRV = 2), as well as how often individuals received a cholesterol test in the past 5 years (X_CHOLCHK = 1) from the 2007 Behavioral Risk Factor Surveillance System dataset, we see design effects that reflect the geographic variability across the blocks of telephone numbers that were sampled for the survey.
+Similarly, when computing the proportion of individuals who have more than 5
+servings of fruits and vegetables a day (X_FV5SRV = 2), as well as how often
+individuals received a cholesterol test in the past 5 years (X_CHOLCHK = 1) from
+the 2007 Behavioral Risk Factor Surveillance System dataset, we see design
+effects that reflect the geographic variability across the blocks of telephone
+numbers that were sampled for the survey.
 
 ```{r BRFSS}
 brfss <- svydesign(
@@ -1322,34 +1409,44 @@ brfss
 ```{r}
 food_labels <- c("Yes Veg", "No Veg")
 chol_labels <- c("within 5 years", ">5 years", "never")
-svymean(~ factor(X_FV5SRV) +
-  factor(X_CHOLCHK),
-brfss,
-deff = TRUE
+svymean(
+  ~ factor(X_FV5SRV) +
+    factor(X_CHOLCHK),
+  brfss,
+  deff = TRUE
 )
 ```
 
 ## Repeated Measurements
 
-Lumley notes that design based inference continues to differ from model based 
-in its analysis of repeated measurements. Where model based inference is 
-careful to account for modeling the -- for example -- within person or within 
-household correlation in a cohort study, no such adjustment is required in a 
-designed survey other than adjusting and using the appropriate weights - 
-treating the repeated measurement like another stage of clustering in the 
-sampling.
+Lumley notes that design based inference continues to differ from model based in
+its analysis of repeated measurements. Where model based inference is careful to
+account for modeling the -- for example -- within person or within household
+correlation in a cohort study, no such adjustment is required in a designed
+survey other than adjusting and using the appropriate weights - treating the
+repeated measurement like another stage of clustering in the sampling.
 
-Lumley illustrates this with the Survey of Income and Program Participation 
+Lumley illustrates this with the Survey of Income and Program Participation
 (SIPP) panel survey.
 
-> Each panel is followed for multiple years, with subsets of the panel 
-participating in four month waves of follow-up... wave 1 of the 1996 panel, 
-which followed 36,730 households with interviews every four months, starting in 
-late 1995 or early 1996... The households were recruited in a two-stage sample.
-The first stage sampled 322 counties or groups of counties as PSUs; the second 
-stage sampled households within these PSUs.
+> Each panel is followed for multiple years, with subsets of the panel
+> participating in four month waves of follow-up... wave 1 of the 1996 panel,
+> which followed 36,730 households with interviews every four months, starting
+> in late 1995 or early 1996... The households were recruited in a two-stage
+> sample. The first stage sampled 322 counties or groups of counties as PSUs;
+> the second stage sampled households within these PSUs.
 
-Lumley demonstrates how to estimate repeated measures with panel data using the `survey` package via the code below. 5 quantiles are estimated across the population and across the 8 months. When Lumley mentions that there is no need for adjusting for correlation in the blockquote above, I believe he is referring to the within-month point estimates. If we were to try and estimate the change in, say, income as a function of other covariates I believe we would want to adjust for correlation in order to get the appropriate standard errors. For the point estimates Lumley points out that the weights are exactly as required for the per-month estimate, but would need to be divided by the number of samples when totaling across the number of measurements. Proportions or regressions are invariant to this scaling factor so no adjustment is needed there.
+Lumley demonstrates how to estimate repeated measures with panel data using the
+`survey` package via the code below. 5 quantiles are estimated across the
+population and across the 8 months. When Lumley mentions that there is no need
+for adjusting for correlation in the blockquote above, I believe he is referring
+to the within-month point estimates. If we were to try and estimate the change
+in, say, income as a function of other covariates I believe we would want to
+adjust for correlation in order to get the appropriate standard errors. For the
+point estimates Lumley points out that the weights are exactly as required for
+the per-month estimate, but would need to be divided by the number of samples
+when totaling across the number of measurements. Proportions or regressions are
+invariant to this scaling factor so no adjustment is needed there.
 
 ```{r}
 sipp_hh <- svydesign(
@@ -1403,7 +1500,9 @@ There are several
 
 ## Questions
 
-1.  The web site has data files demo_x.xpt of demographic data and bpx_c.xpt of blood pressure data from NHANES 2003-2004. Code to load and merge these data sets is in Appendix B, in Figure B.1
+1.  The web site has data files demo_x.xpt of demographic data and bpx_c.xpt of
+    blood pressure data from NHANES 2003-2004. Code to load and merge these data
+    sets is in Appendix B, in Figure B.1
 
 <!-- -->
 
@@ -1418,42 +1517,40 @@ ddf <- haven::read_xpt("data/nhanesxpt/demo_c.xpt")
 bpdf <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
 ```
 
-b.  Estimate the proportion of the US population with systolic blood pressure 
-over 140 mm HG
+b.  Estimate the proportion of the US population with systolic blood pressure
+    over 140 mm HG
 
 # Chapter 4: Graphics
 
 Lumley advocates for three principles in visualizing survey data:
 
-1. Base the graph on an estimated population distribution.
+1.  Base the graph on an estimated population distribution.
 
-2. Explicitly indicate weights on the graph.
+2.  Explicitly indicate weights on the graph.
 
-3. Draw a simple random sample from the estimated population distribution and
-graph this sample instead.
+3.  Draw a simple random sample from the estimated population distribution and
+    graph this sample instead.
 
+All three of these strategies are meant to counteract the difficulty in
+visualizing survey data --- the data available do not represent the population
+of interest without re-weighting.
 
-All three of these strategies are meant to counteract the difficulty in 
-visualizing survey data --- the data available do not represent the 
-population of interest without re-weighting.
-
-While these principles are great and worth following, I found Lumley's 
-demonstrations in this chapter a little out
-of date. Thanks to the [ggplot](https://ggplot2.tidyverse.org/) family of 
-libraries and [shiny](https://www.rstudio.com/products/shiny/) there's been
-huge advances in visualizing and interacting with data of all types -- survey
-included. What's more, it isn't always clear how he produces the charts in the
-chapter. Consequently I've done my best to reproduce the same charts, or a chart 
-I'd consider appropriate for the question / survey at hand in the following
-charts.
+While these principles are great and worth following, I found Lumley's
+demonstrations in this chapter a little out of date. Thanks to the
+[ggplot](https://ggplot2.tidyverse.org/) family of libraries and
+[shiny](https://www.rstudio.com/products/shiny/) there's been huge advances in
+visualizing and interacting with data of all types -- survey included. What's
+more, it isn't always clear how he produces the charts in the chapter.
+Consequently I've done my best to reproduce the same charts, or a chart I'd
+consider appropriate for the question / survey at hand in the following charts.
 
 ## Plotting a Table
 
-Lumley recommends using bar charts, forest plots and fourfold plots to 
-visualize the data from a table. I would agree that all of these are "fine"
-in a certain context but strongly prefer the forest plot and variations on 
-it personally, since it does more than all the other to include representations
-of uncertainty about the tabulated estimates.
+Lumley recommends using bar charts, forest plots and fourfold plots to visualize
+the data from a table. I would agree that all of these are "fine" in a certain
+context but strongly prefer the forest plot and variations on it personally,
+since it does more than all the other to include representations of uncertainty
+about the tabulated estimates.
 
 ```{r barplot_medians}
 medians %>%
@@ -1485,13 +1582,155 @@ medians %>%
   ))
 ```
 
-
 # Chapter 5: Ratios and Linear Regression
 
 Lumley identifies two main uses for regression in analyzing complex surveys:
 
-1. Identifying relationships between variables --- similar to any other data.
-2. More accurate estimates of population means and totals.
+1.  Identifying relationships between variables --- similar to any other data.
+2.  More accurate estimates of population means and totals.
+
+In contrast to model based inference which typically discusses linear regression
+in the context of distributional assumptions on the outcome variable, Lumley
+notes that his discussion of regression is still within the design-based 
+philosophy and consequently no model based assumptions are needed in order to 
+compute valid 95% confidence intervals. However, model choice still matters
+insofar as one's goal is to precisely estimate a relationship or 
+population mean or total.
+
+## 5.1 Ratio Estimation
+
+Ratio estimation comes up first in this chapter because it is important in 
+estimating (1) a population mean/total, (2) a ratio directly or (3) a 
+subpopulation estimate of a mean.
+
+
+Lumley illustrates how to estimate ratios in design methods by using the api
+dataset and estimating the proportion of students who took the Academic 
+Performance Index exam.
+
+```{r ratio_estimate}
+svyratio(~api.stu, ~enroll, strat_design)
+```
+
+This estimate does a good job of estimating the true population total, 0.84,
+which we happen to have access to for this example.
+```{r ratio_truth}
+round(sum(apipop$api.stu) / sum(apipop$enroll, na.rm = TRUE), 2)
+```
+
+It's worth noting here as Lumley does that ratio estimates are not unbiased 
+but are classified as "approximately unbiased" since the bias decreases
+proportional to the sample size and is consequently smaller than the standard
+error -- which decreases proportional to $\frac{1}{\sqrt{n}}$. 
+
+### Ratios for subpopulation estimates
+
+Lumley notes that in the case where individual - not aggregate - data are
+available the ratio being estimated is simply a proportion. This is the same
+logic for which subpopulation estimates had been calculated previously in
+[Chapter 2:Simple Random Sample] via the `svybdy()` function. These estimates
+require special handling - though in the survey package they can all be 
+calculated via `svymean()`, `svyratio()` and `svycontrast()` which I show 
+below using the same odesigne object from Chapter 2.
+
+It is worth noting before doing so however, that the special handling needed
+here follows from the fact that both the numerator and the denominator are
+estimated. Lumley delves into this in the appendix which I'll reproduce here
+alongside questions I have that I'll look to return to in the future.
+
+We'll define the subpopulation estimate of interest using the indicator function
+$Y_i = X_iI(Z_I > 0)$, where $I(Z_i > 0) = 1$ for members of the 
+subpopulation and 0 otherwise, and $X_i$ is the measurement of interest.
+
+
+The variance estimate using replicate weights can be calculated similar to the
+typical variance estimate, those replicate weights belonging to sample 
+observations outside the subpopulation are simply not used - this again 
+highlights the utility of replicate weights.
+
+
+For linearization - that is using a taylor series to estimate the variance -
+the value becomes more complicated, following Lumley's appendix the HTE is
+defined as:
+
+$$
+\hat{V}[\hat{T}_Y] = \sum_{i,j} \left(\frac{Y_i Y_j}{\pi_ij} - 
+\frac{Y_i}{\pi_i} \frac{Y_j}{\pi_j} \right) \\
+= \sum_{Z_i,Z_j > 0} \left(\frac{Y_i Y_j}{\pi_ij} - 
+\frac{Y_i}{\pi_i} \frac{Y_j}{\pi_j} \right).
+$$
+
+Here however, Lumley states
+
+> but the simplified computational formulas for special designs are not the same.
+
+
+which I don't completely understand. I suppose he means for clustered or 
+multiphase designs things but it isn't clear as he goes onto say
+
+> for example, the formula for the variance of a total under simple random 
+sampling (equation 2.2)
+
+
+$$
+V[\hat{T}_X] = \frac{N-n}{N} \times N^2 \times \frac{V[X]}{n}
+$$
+
+> cannot be replaced by
+
+$$
+V[\hat{T}_Y] \stackrel{?}{=} \frac{N-n}{N} \times N^2 \times \frac{V[X]}{n}
+$$
+
+> or even, defining $n_D$ as the number sampled in the subpopulation, by
+
+$$
+\stackrel{?}{=} \frac{N-n_D}{N} \times N^2 \times \frac{V[X]}{n_D}
+$$
+
+
+> In order to use these simplified formulas it is necessary to work with the
+variable $Y$ and use
+
+$$
+V[\hat{T}_Y] = \frac{N-n}{N} \times N^2 \times \frac{V[Y]}{n}
+$$
+
+Its not clear in this last expression if we're simply back to the initial
+expression that couldn't be used, or if we're using the smaller sample 
+subset again for variance computations but Lumley's next text suggests that's
+the case:
+
+> Operationally, this means that variance estimation in a subset of a survey 
+design object in R needs to involve the $n-n_D$ zero contributions to an
+estimation equation. 
+
+I hope to shed more light on what's going on here in the future but for now its
+clear why this is in the appendix, but not exactly clear to me why observations
+outside the subpopulation are *simply* zero'd in variance computation.
+
+
+```{r ratio_subpop_one}
+svymean(~bmi_p, subset(chis, srsex == "MALE" & racehpr =="AFRICAN AMERICAN"))
+```
+
+
+```{r ratio_subpop_two}
+chis <- update(chis,
+               is_aamale = (srsex == "MALE" & racehpr =="AFRICAN AMERICAN"))
+svyratio(~I(is_aamale*bmi_p), ~is_aamale, chis)
+```
+
+```{r ratio_subpop_three}
+totals <- svytotal(~I(bmi_p*is_aamale) + is_aamale, chis)
+totals
+```
+
+### Ratio estimators of totals
+
+## Linear Regression
+
+
 
 # Chapter 6: Categorical Data Regression
 
@@ -1501,9 +1740,9 @@ Lumley identifies two main uses for regression in analyzing complex surveys:
 
 Lumley motivates the need to explore the three titular topics by expanding on
 the principle developed in the second chapter --- stratification. Similar as to
-how making use of the extra information available in strata we can improve 
+how making use of the extra information available in strata we can improve
 estimates in straightforward estimation of totals and means, Lumley's focus in
-this chapter is how to use the "auxiliary" information to adjust for 
+this chapter is how to use the "auxiliary" information to adjust for
 non-response bias and improve the precision of the estimates.
 
 ## Post-Stratification
@@ -1515,13 +1754,13 @@ have been involved in the inital sampling design.
 Consider a relatively straightforward design in which there's a population of
 subjects of size $N$ that can be partitioned into $K$ mutually exclusive strata
 from which any of the $N_k$ individuals in that strata can be sampled for $n_k$
-strata samples. In this setting the sampling weights for each individual in 
+strata samples. In this setting the sampling weights for each individual in
 group $k$ is $\frac{N_k}{n_k}$ and $N_k$ is known without any uncertainty.
 
-If the sampling were not stratified but $N_k$ were still known, the group
-sizes would not be exactly correct by simple Horvitz-Thompson estimation, but
-they could be corrected by re-weighting so that the sizes are correct as they
-would be in stratified sampling.
+If the sampling were not stratified but $N_k$ were still known, the group sizes
+would not be exactly correct by simple Horvitz-Thompson estimation, but they
+could be corrected by re-weighting so that the sizes are correct as they would
+be in stratified sampling.
 
 Specifically, take each weight $w_i = \frac{1}{\pi_i}$ and construct new weights
 $w_i^* = \frac{g_i}{\pi_i} = \frac{N_k}{\hat{N}_k} \times \frac{1}{\pi_i}$.
@@ -1532,17 +1771,15 @@ $$
 n_k \times \frac{g_i}{\pi_i} = n_k \times \frac{1}{\pi_i} \times
 \frac{N_k}{\hat{N}_k} = n_k \times \frac{\hat{N}_k}{n_k} \times 
 \frac{N_k}{\hat{N}_k} = N_k,
-$$
-where $\pi_i = \frac{n_k}{\hat{N}_k}$. The consequence of this re-weighting 
+$$ where $\pi_i = \frac{n_k}{\hat{N}_k}$. The consequence of this re-weighting
 means that the estimated sub group population is exactly correct and subsequent
 estimates within or across these groups benefit from the extra information.
 
-Of course, as Lumley notes, there's a problem if no entities were sampled
-in the particular strata of interest - you can't re-weight the number 0. Still
-since this is unlikely to happen for groups and samples of "reasonable" size
-post-stratification is still a worthy strategy given the potential reductions
-in variance that are possible.
-
+Of course, as Lumley notes, there's a problem if no entities were sampled in the
+particular strata of interest - you can't re-weight the number 0. Still since
+this is unlikely to happen for groups and samples of "reasonable" size
+post-stratification is still a worthy strategy given the potential reductions in
+variance that are possible.
 
 ```{r post_stratify}
 clus2_design
@@ -1562,8 +1799,6 @@ svytotal(~enroll, clus2_design, na.rm = TRUE)
 svytotal(~enroll, ps_design, na.rm = TRUE)
 ```
 
-
-
 ```{r post_stratify_demo}
 prob_pv <- function(score) {
   pmin(1, .5 * score + .5 * score^2)
@@ -1571,40 +1806,198 @@ prob_pv <- function(score) {
 num_days <- 30
 N_day <- 2E4
 
-pop_df <- map_dfr(1:num_days, function(day_ix){
+pop_df <- map_dfr(1:num_days, function(day_ix) {
   df <- tibble(
     scores = c(rlnorm(N_day, -5, 1.5), runif(1E4)),
     day = day_ix
-  ) %>% 
+  ) %>%
     mutate(
       scores = pmin(1, scores),
       pv = rbinom(N_day + 1E4, 1, prob = prob_pv(scores)),
       score_bucket = floor(scores * 100)
-    ) %>% 
-  group_by(day,score_bucket) %>%
-  mutate(strata_size = n()) %>%
-  ungroup()
-}) %>% 
-  mutate(strata = interaction(day,score_bucket))
+    ) %>%
+    group_by(day, score_bucket) %>%
+    mutate(strata_size = n()) %>%
+    ungroup()
+}) %>%
+  mutate(strata = interaction(day, score_bucket))
 
 samp <- pop_df %>%
+  filter(day != 30) %>%
   group_by(strata) %>%
-  slice_sample(n = 5, replace = FALSE) %>% 
-  ungroup() %>% 
+  slice_sample(n = 5, replace = FALSE) %>%
+  ungroup() %>%
   mutate(weight = strata_size / n())
 
-samp_ds <- samp %>% 
-  as_survey_design(fpc = strata_size, strata = strata)
+samp_ds <- samp %>%
+  as_survey_design(weight = weight, strata = strata)
 
-samp_ds %>% 
-  summarize(pv_all = survey_total(pv, vartype = "ci"))
+day_thrty_cnts <- pop_df %>%
+  filter(day == 30) %>%
+  group_by(score_bucket) %>%
+  count() %>%
+  ungroup()
+
+day_thrty_truth <- pop_df %>%
+  filter(day == 30) %>%
+  group_by(score_bucket) %>%
+  summarize(pv = sum(pv))
+
+pv_est <- samp_ds %>%
+  group_by(score_bucket) %>%
+  summarize(pv_all = survey_mean(pv)) %>%
+  ungroup() %>%
+  inner_join(day_thrty_cnts, by = "score_bucket") %>%
+  mutate(
+    pv_thrty_est = pv_all * n,
+    pv_thrty_std_err = pv_all_se^2 * n^2
+  ) %>%
+  inner_join(day_thrty_truth, by = "score_bucket") %>%
+  summarize(
+    estimate = sum(pv_thrty_est),
+    std_err = sqrt(sum(pv_thrty_std_err)),
+    lower = estimate - 1.96 * std_err,
+    upper = estimate + 1.96 * std_err,
+    truth = sum(pv)
+  ) %>%
+  select(-std_err) %>%
+  mutate(method = "strata", term = "PVE")
+pv_est
 ```
 
 ```{r}
-
+fit <- svyglm(pv ~ scores + I(scores^2), samp_ds, family = quasibinomial())
+L <- chol(vcov(fit))
+samples <- t(sapply(1:2E3, function(x) L %*% rnorm(3) + coef(fit)))
+X <- pop_df %>%
+  filter(day == 30) %>%
+  mutate(scores_sq = scores^2, intercept = 1) %>%
+  select(intercept, scores, scores_sq) %>%
+  as.matrix()
+sum_pv <- apply(binomial()$linkinv(tcrossprod(samples, X)), 1, sum)
+pv_est_regs <- tibble(
+  method = "survey-regression",
+  term = "PVE",
+  estimate = mean(sum_pv),
+  lower = quantile(sum_pv, 0.025),
+  upper = quantile(sum_pv, 0.975),
+  truth = pv_est$truth
+)
 ```
 
+```{r}
+mfit <- glm(pv ~ scores + I(scores^2), samp, family = binomial())
+L <- chol(vcov(mfit))
+samples <- t(sapply(1:2E3, function(x) L %*% rnorm(3) + coef(fit)))
+X <- pop_df %>%
+  filter(day == 30) %>%
+  mutate(scores_sq = scores^2, intercept = 1) %>%
+  select(intercept, scores, scores_sq) %>%
+  as.matrix()
+sum_pv <- apply(binomial()$linkinv(tcrossprod(samples, X)), 1, sum)
+pv_est_regm <- tibble(
+  method = "model-regression",
+  term = "PVE",
+  estimate = mean(sum_pv),
+  lower = quantile(sum_pv, 0.025),
+  upper = quantile(sum_pv, 0.975),
+  truth = pv_est$truth
+)
+```
 
+```{r}
+rbind(
+  pv_est_regs,
+  pv_est_regm,
+  pv_est
+) %>%
+  ggplot(aes(x = term, y = estimate, color = method)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper),
+    position = position_dodge(width = .2)
+  ) +
+  geom_hline(aes(yintercept = truth),
+    linetype = 2, color = "red"
+  ) +
+  xlab("") +
+  ylab("# Entities") +
+  theme(legend.title = element_blank()) +
+  ggtitle("PVE Estimation", subtitle = str_c(
+    "Minimal Strata Variance comes from \nfinite ",
+    "population correction factor"
+  ))
+```
+
+```{r}
+# Now again with activity weighted samples w/in strata subset
+pop_df <- map_dfr(1:num_days, function(day_ix) {
+  df <- tibble(
+    scores = c(rlnorm(N_day, -5, 1.5), runif(1E4)),
+    is_active = rbinom(N_day + 1E4, size = 1, prob = 0.02),
+    day = day_ix
+  ) %>%
+    mutate(
+      scores = pmin(1, scores),
+      activity = is_active * rlnorm(N_day + 1E4),
+      pv = rbinom(N_day + 1E4, 1, prob = prob_pv(scores)),
+      score_bucket = floor(scores * 100)
+    ) %>%
+    group_by(day, score_bucket, is_active) %>%
+    mutate(
+      strata_size = n(),
+      weight = if_else(is_active == 1, activity, strata_size / 5)
+    ) %>%
+    ungroup()
+}) %>%
+  mutate(strata = interaction(day, score_bucket, is_active))
+
+samp <- pop_df %>%
+  filter(day != 30) %>%
+  group_by(strata) %>%
+  slice_sample(n = 5, replace = FALSE) %>%
+  ungroup()
+
+samp_ds <- samp %>% 
+  as_survey_design(strata = strata, weights = weight)
+```
+
+```{r}
+options(survey.lonely.psu="adjust")
+day_thrty_truth <- pop_df %>%
+  filter(day == 30) %>%
+  group_by(score_bucket,is_active) %>%
+  summarize(pv = sum(pv),
+            pva = sum(pv*activity)) %>% 
+  group_by(score_bucket) %>% 
+  summarize(pv = sum(pv),
+            pva = sum(pva))
+
+day_thrty_cnts <- pop_df %>% 
+  filter(day == 30, is_active == 1) %>% 
+  group_by(score_bucket) %>% 
+  summarize(activity = sum(activity))
+  
+
+pv_est <- samp_ds %>%
+  group_by(score_bucket,is_active) %>%
+  summarize(pv_all = survey_mean(pv)) %>%
+  ungroup() %>%
+  inner_join(day_thrty_cnts, by = "score_bucket") %>%
+  mutate(
+    pv_thrty_est = pv_all * activity,
+    pv_thrty_std_err = pv_all_se^2 * activity^2
+  ) %>%
+  inner_join(day_thrty_truth, by = "score_bucket") %>%
+  summarize(
+    estimate = sum(pv_thrty_est),
+    std_err = sqrt(sum(pv_thrty_std_err)),
+    lower = estimate - 1.96 * std_err,
+    upper = estimate + 1.96 * std_err,
+    truth = sum(pv)
+  ) %>%
+  select(-std_err) %>%
+  mutate(method = "strata", term = "PVE")
+pv_est
+```
 
 # Chapter 8: Two-Phase Sampling
 
