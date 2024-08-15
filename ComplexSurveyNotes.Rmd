@@ -40,8 +40,8 @@ theme_set(theme_bw() + theme(
 
 What follows is a coded work through of Thomas Lumley's "Complex Surveys: A
 Guide to Analysis in R" [@lumley2011complex] and the methods underlying
-so-called [design based](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2856970/)
-statistics more broadly. This write-up will reflect my understanding of the
+[design based](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2856970/)
+statistics more broadly. This write-up reflects my understanding of the
 material with additions made to try and clarify ideas further. These include
 simulations, derivations or references that I found helpful in working through
 Lumley's material. Most of the datasets that I use throughout these notes are
@@ -396,7 +396,7 @@ $$
 \sum_{i=1}^{n} \sum_{j=1}^{n} \frac{x_ix_j}{\pi_i \pi_j}  - \frac{x_i x_j}{\pi_{ij}}\
 $$
 
-I'm not sure how the  signs switch on the last line to reproduce expression 1.2
+I'm not sure how the signs switch on the last line to reproduce expression 1.2
 
 1.11 Another popular way to write the Horvitz-Thompson variance estimator is
 
@@ -407,7 +407,40 @@ $$
 
 Show that this is equivalent to equation 1.2
 
-To be written later.
+We need to show that the above is equivalent to
+$$
+\sum_{i,j} \frac{X_iX_j}{\pi_{ij}} - \frac{X_i}{\pi_i}\frac{X_j}{\pi_j}
+$$
+
+First we fix $i \neq j$ in the above expression and we find
+$$
+\sum_{i\neq j} \frac{X_iX_j}{\pi_{ij}} - \frac{X_i}{\pi_i}\frac{X_j}{\pi_j} = 
+\sum_{i\neq j} X_iX_j(\frac{1}{\pi_{ij}} - \frac{1}{\pi_i} \frac{1}{\pi_j}) \\
+= \sum_{i \neq j} X_iX_j(\frac{\pi_i \pi_j - \pi_{ij}}{\pi_{ij}\pi_i\pi_j})
+$$
+
+which is the latter part in the desired expression save for a sign, which again 
+I must be missing somehow or is an error in the book. 
+
+Now we take $i=j$ and return to expression 1.2 in which we have,
+
+$$
+\sum_{i=j} \frac{X_i X_j}{\pi_{ij}} - \frac{X_i}{\pi_i} \frac{X_j}{\pi_j} \\ 
+= \sum_{i=j} \frac{X_i^2}{\pi_{ii}} - \frac{X_i}{\pi_i} \frac{X_i}{\pi_i} \\
+= \sum_{i=j} X_i^2 (\frac{1}{\pi_{ii}} - \frac{1}{\pi_i^2} ) \\
+= \sum_{i=j} X_i^2 (\frac{\pi_i^2 - \pi_{ii}}{\pi_i^2 \pi_{ii}})
+$$
+Clearly we have to formulate $\pi_{ii}$ in terms of $\pi_i$ but isn't immediately
+clear to me how to do so. We know that for the two terms to be equal we must have
+
+$$
+\frac{\pi_i^2 - \pi_{ii}}{\pi_i^2 \pi_{ii}} = \frac{1 - \pi_i^2}{\pi_i^2}  \\
+\iff \\
+\pi_{ii} = \frac{\pi_i^2}{2- \pi_i^2}
+$$
+Which I suppose we'll take to be the expression of a co-inclusion probability of
+an entity sampled with itself (this must assume sampling with replacement) for
+this expression to be true.
 
 ## Chapter 1 Appendix
 
@@ -1360,6 +1393,50 @@ simdf %>%
     for two strata. Extend this to any number of strata by using the fact that
     an optimal allocation cannot be improved by moving samples from one stratum
     to another stratum.
+    
+$$
+\hat{V}[\hat{T}] = V_1 + V_2 \\
+V_1 = \frac{N_1 - n_1}{N_1} N_1^2 \frac{\sigma^2_1}{n_1} \\ 
+V_2 = \frac{N_2 - (n - n_1)}{N_2} N_2^2 \frac{\sigma^2_2}{n_2}
+$$
+taking the derivative ...
+
+$$
+\frac{d\hat{V}[\hat{T}]}{dn_1} = \frac{dV_1}{dn_1} + \frac{dV_2}{dn_1} \\
+= \frac{-N_1^2 \sigma^2_1}{n_1^2} + \frac{N_2^2 \sigma_2^2}{(n - n_1)^2}
+$$
+setting to zero and and solving for $n_1$ we get
+$$
+\frac{-N_1^2 \sigma^2_1}{n_1^2} + \frac{N_2^2 \sigma_2^2}{(n - n_1)^2} = 0 \\
+\iff \\
+\frac{N_2^2\sigma^2_2}{(n-n_1)^2} = \frac{N_1^2\sigma_1^2}{n_1^2}\\
+\iff \\
+\frac{n_1^2}{(n-n_1)^2} = \frac{N_1^2\sigma_1^2}{N_2^2\sigma^2_2} \\
+\iff \\
+\frac{n_1}{(n-n_1)} = \frac{N_1\sigma_1}{N_2\sigma}  \\
+\iff \\ 
+n_1 = \frac{nN_1\sigma_1}{N_2\sigma_2(1 + \frac{N_1\sigma_1}{N_2\sigma_2})} \\
+ = \frac{nN_1\sigma_1}{N_2\sigma_2 + N_1\sigma_1}
+$$
+
+Where the square root is taken over variables constrained to be positive so
+we only have the positive values as the solution to the equation.
+
+Also, $N_1, N_2$ are taken to be the population strata sizes and 
+$\sigma_1, \sigma_2$ are the strata standard deviations.
+
+We can check the second derivative to ensure this is a global optima or we can
+use the fact that the variance is a quadratic function and is therefore convex.
+Consequently, there is only 
+[one global optima](https://en.wikipedia.org/wiki/Convex_function#Properties).
+
+Examining the expression - we see the optimal strata size is the
+variance of each strata weighted by the size of the strata as a fraction of 
+the same value added across all strata, i.e. the population variance.
+
+Here we've derived the solution for the "first" strata, but this is arbitrary
+and there would be a similar value for any strata, for a design with any number
+of strata.
 
 9.  Write an R function that takes inputs
     $n_1, n_2, N_1, N_2, \sigma^2_1, \sigma^2_2$ and computes the variance of
@@ -1375,8 +1452,8 @@ strat_var_sample <- function(n_1, n_2, N_1, N_2, sigma_1, sigma_2) {
   }
   return(one_strat_var(n_1, N_1, sigma_1) + one_strat_var(n_2, N_2, sigma_2))
 }
-grid_of_ns <- expand.grid(
-  n_1 = seq(1, 100, 25), n_2 = seq(1, 100, 25),
+expand.grid(
+  n_1 = seq(2, 100, 10), n_2 = seq(2, 100, 10),
   N_1 = 1E3, N_2 = 1E3, sigma_1 = 1, sigma_2 = 1
 ) %>% 
   as_tibble() %>% 
@@ -1385,8 +1462,19 @@ grid_of_ns <- expand.grid(
     n_2 = factor(n_2)
   ) %>% 
   ggplot(aes(x = n_1, y = var, color = n_2)) + 
-  geom_point() + geom_line()
+  geom_point() + geom_line() +
+  ylab("Variance") +
+  ggtitle("Two Strata Design Variance", subtitle = "For Varying Strata Sizes")
 ```
+
+I think the point Lumley is after is that the variance doesn't change 
+dramatically after each sample size is roughly more than ten. This is the
+quadratic behavior of the variance at play. Obviously the "optimal" variance
+will be found at the highest $n_1$ and $n_2$ as those values will provide the 
+lowest variance. In terms of where the greatest efficiency lies, however, 
+we see the greatest change in the variance estimates after the two sample 
+sizes are greater than 10, as stated previously.
+
 
 10. Verify that equation 2.2 gives the HTE of variance for a SRS
 
@@ -1394,6 +1482,18 @@ grid_of_ns <- expand.grid(
 a)  Show that when $i \neq j$ $$
     \pi_{ij} = \frac{n}{N}n - 1N - 1
     $$
+This follows from combinatorics. We want the number of combinations in which
+two (different) items are chosen from a sample of n together, divided by the 
+total number of combinations of n samples from a population of size N. Though,
+it isn't clear to me whether the overall sampling design should be with or 
+without replacement - I assume without below.
+
+$$
+\frac{n \choose 2}{N\choose n} = \frac{n!}{(n-2)!2!} \frac{(N-n)!n!}{N!} \\
+=\frac{n(n-1)n!}{2N(N-1)}
+$$
+I don't see yet how this reduces to the intended form but may return to this
+later.
 
 b)  Compute $\pi_{ij} - \pi_i \pi_j$
 
@@ -1604,8 +1704,7 @@ election <- as_tibble(election) %>%
     p = 40 * votes / sum(votes)
   )
 election
-library(sampling)
-insample <- UPtille(election$p)
+insample <- sampling::UPtille(election$p)
 ppsample <- election[insample == 1, ]
 ppsample$wt <- 1 / ppsample$p
 pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample)
@@ -1797,17 +1896,252 @@ bpdf_design <- bpdf %>%
 ```
 
 b.  Estimate the proportion of the US population with systolic blood pressure
-    over 140 mm HG
+    over 140 mm HG, with diastolic blood pressure over 90 mm Hg, and with both.
     
+Lumley doesn't tell us which variable name corresponds to the measurements 
+indicated and I didn't see any documentation in the files included so I just
+guess here.
 ```{r}
 bpdf_design %>% 
   mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1
+    sys_over_140 = (BPXSY1 > 140) * 1,
+    dia_over_90 = (BPXDI1 > 90) * 1,
+    hbp = (sys_over_140 + dia_over_90 == 2) * 1
   ) %>% 
   summarize(
-    prop_hbp = survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci")
-  )
+    prop_hbp_one = 
+      survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
+    prop_hbp_two = 
+      survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
+    prob_hbp = survey_ratio(hbp, n(), na.rm = TRUE, vartype = "ci", deff = TRUE)
+  ) %>%
+  gather(everything(), key = "metric", value = "value")
 ```
+
+c. Estimate the design effects for these proportions.
+
+Included in the output above.
+
+d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
+
+```{r}
+nhanes_ests <- bpdf_design %>% 
+  mutate(
+    sys_over_140 = (BPXSY1 > 140) * 1,
+    dia_over_90 = (BPXDI1 > 90) * 1,
+    hbp = (sys_over_140 + dia_over_90 == 2) * 1,
+    age_group = cut(RIDAGEYR, c(0,21,65,Inf)),
+    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male","Female"))
+  ) %>% 
+  group_by(sex,age_group) %>%
+  summarize(
+    prop_hbp_one = 
+      survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
+    prop_hbp_two = 
+      survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
+    prob_hbp = survey_ratio(hbp, n(), na.rm = TRUE, vartype = "ci", deff = TRUE)
+  ) %>% ungroup()
+nhanes_ests
+```
+
+This produces a bunch of output, so I plot the high blood pressure result ---
+both high systolic and diastolic blood pressure -- below.
+
+```{r}
+nhanes_ests %>% 
+  select(age_group, sex, prob_hbp, prob_hbp_low, prob_hbp_upp) %>% 
+  filter(!is.na(age_group)) %>% 
+  ggplot(aes(x = age_group, y = prob_hbp, color = sex)) +
+  geom_pointrange(aes(ymin = prob_hbp_low, ymax = prob_hbp_upp), 
+                  position = position_dodge(width = .25)) +
+  ylab("% US Population with High Blood Pressure") +
+  xlab("Age Group") + 
+  ggtitle("Prevalence of High Blood Pressure in U.S. Across Age and Sex",
+          subtitle = "Data from NHANES 2003-2004") +
+  scale_y_continuous(labels = scales::percent)
+```
+
+3.2 Repeat the sampling and estimation in Figure 3.4 1000 times.
+
+FYI the `sampling::UPtille` function takes a while so running this simulation
+1000 times takes a while
+```{r simulated_pps, cache = TRUE}
+one.sim <- function() {
+  insample <- sampling::UPtille(election$p)
+  ppsample <- election[insample == 1,]
+  ppsample$wt <- 1 / ppsample$p
+  pps_design <- svydesign(id=~1, weight = ~wt, data = ppsample)
+  total <- svytotal(~Bush+Kerry+Nader, pps_design)
+  std_err <- sqrt(diag(attr(total, "var")))
+  ci <- confint(total)
+  out <- cbind(total,std_err,ci)
+}
+total_sims <- replicate(10, one.sim())
+```
+
+a) Check that the mean of the estimated totals is close to the true population 
+totals.
+
+```{r pps_totals, eval = FALSE}
+estimated_totals <- as_tibble(t(rowMeans(total_sims[,1,]))) %>% 
+  mutate(label = "Estimate")
+
+true_totals <- as_tibble(t(colSums(election[,c("Bush","Kerry","Nader")]))) %>% 
+  mutate(label = "Truth")
+
+rbind(estimated_totals, true_totals) %>% 
+  gather(everything(), -label, key = "Candidate", value = "Vote Count") %>% 
+  spread(label,`Vote Count`) %>% 
+  gt::gt() %>% 
+  gt::fmt_scientific() %>% 
+  gt::tab_header("Simulated Total Comparison")
+```
+
+These are quite close.
+
+b). Compute the mean of the estimated standard errors and compare it to the
+true simulation standard error, that is, the standard deviation of the 
+estimated totals.
+
+```{r pps_stderrs, eval = FALSE}
+estimated_stderrs <- as_tibble(t(rowMeans(total_sims[,2,]))) %>% 
+  mutate(label = "Estimate")
+
+true_stderr <- as_tibble(apply(total_sims,1,sd)) %>% 
+  mutate(label = "Truth")
+
+rbind(estimated_stderrs, true_stderr) %>% 
+  gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>% 
+  spread(label,`Vote Std.Err`) %>% 
+  gt::gt() %>% 
+  gt::fmt_scientific() %>% 
+  gt::tab_header("Simulated Standard Error Comparison")
+```
+
+c) Estimate 95% confidence intervals for the population totals and compute the 
+proportion of intervals that contain the true population value.
+
+```{r pps_cis}
+totals <- unlist(true_totals[,1:3])
+prop_contained <- rowMeans((total_sims[,3,] < totals & total_sims[,4,] > totals) * 1)
+prop_contained 
+```
+
+We see that the proportion contained by the interval is near the 95% nominal 
+value.
+
+
+3.3  The National Longitudinal Study of Youth is documented at 
+www.nlsinfo.org/nlsy97/nlsdocs/nlsy97/maintoc.html
+
+a) What are the stages of sampling and the sampling units at each stage?
+
+
+From the 
+[website](https://www.nlsinfo.org/content/cohorts/nlsy97/intro-to-the-sample/sample-design-screening-process)
+the sampling occurred in 2 phases (see image below).
+
+![](https://www.nlsinfo.org/sites/default/files/attachments/sample-figure%201.JPG)
+
+The first phase screened households and the second identified eligible
+respondents. I think this would technically be called a two phase sample 
+(discussed in chapter 8) but given the population sizes involved it may be that
+there was no need to account for the potential dependence here. 
+
+The sampling unit in the first stage came from NORC's 1990 sampling design which
+used Standard Metropolitan Statistical Areas or non-metropolitan counties. That
+is, according to the general social survey 
+[documentation](https://gss.norc.org/Documents/codebook/GSS_Codebook_AppendixA.pdf)
+
+Subsequent sampling units are segments, households, and then members of 
+households.
+
+b) What would the strata and PSUs be for the single stage approximation to 
+the design?
+
+The strata would be the cross sectional
+
+
+3.4  The British Household Panel Survey is documented at 
+http://www.iser.essex.ac.uk/survey/bhps .
+
+a) What are the stages of sampling, strata and the sampling units at each stage?
+b) What would the strata and PSUs be for the single stage approximation to
+the design?
+
+
+3.5 Statistics New Zealand lists survey topics at 
+http://www.stats.govt.nz/datasets/a-z-list.htm . Find the Household Labour Force
+Survey.
+
+a) What are the stages of sampling and the sampling units at each stage?
+b) What would the strata and PSUs be for the single stage approximation to
+the design?
+
+3.6 This exercise uses the Washington State Crime data for 2004 as the 
+population. The data consists of crime rates and population size for the
+police districts (in cities/towns) and sheriffs' offices 
+(in unincorporated areas), grouped by county.
+
+a) Take a simple random sample of 10 counties from the state and use all the
+data from the sampled counties. Estimate the total number of murders and
+burglaries in the state.
+
+
+b) Stratify the sampling so that King County is sampled with 100% probability
+together with a simple random sample of five other counties. Estimate the
+total number of of murders and burglaries in the state and compare to the
+previous estimates.
+
+c) Take simple random samples of five police districts from King County and
+five counties from the rest of the state. Estimate the total number of murders
+and burglaries in the state and compare to the previous estimates.
+
+d) Take a probability proportional to size (PPS) sample of 10 police districts.
+Estimate the total number of murders and burglaries in the state and compare
+to the previous estimates.
+
+3) Take a simple random sample of counties and include all the police districts.
+Estimate the total number of murders and burglaries in the state and
+compare to the previous estimates.
+
+3.7 Use the household data from the 1966 SIP panel to estimate the 25th, 50th,
+75th, 90th and 95th percentiles of income for households of different sizes
+(`ehhnumpp`) averaged over the fourth months. You will want to recode the large
+values of `ehhnumpp` to a a single category. Describe the patterns you see.
+
+3.8 In the data from the 1996 SIPP panel
+a) What proportion of households received any "means-tested cash benefits"
+(`thtrninc`)? For those households that did not receive benefits what mean
+proportion of their total income came from these benefits?
+b) What proportion of households paid rent `tmthrnt`? What were the mean and the
+75th and 95th percentiles of the proportion of monthly income paid in rent?
+What proportion paid more than one third of their income in rent?
+
+3.9 By the time you read this, the `survey` package is likely to provide some
+approximations for PPS designs that use the finite population size information.
+Repeat 3.2 using these.
+
+3.10 Repeat 3.2 computing the Hartley-Rao approximation and the full 
+Horvitz-Thompson estimate using the code and joint-probability data on the web
+site. Compare the standard errors from these two approximations to the standard
+errors from the single-stage with replacement approxmiation and to the true
+simulation standard error.
+
+3.11 Since 1999, NHANES has been conducting suveys continuously with data 
+released on a 2 year cycle. Each data set includes a weight variable for
+analyzing the two-year data; the weights add to the size of the US adult, 
+civilian, non-institutionalized population.
+
+a) What weight would be appropriate for estimating the number of diabetics in
+the population combining data from two two-year data sets?
+b) What weight would be appropriate if three two-year data sets were used?
+c) What weights would be appropriate when estimating changes, comparing
+the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
+2005-2006 data?
+d) How would the answers differ if the goal was to estimate a population 
+proportion rather than a total?
+
 
 # Chapter 4: Graphics
 
