@@ -1455,14 +1455,15 @@ strat_var_sample <- function(n_1, n_2, N_1, N_2, sigma_1, sigma_2) {
 expand.grid(
   n_1 = seq(2, 100, 10), n_2 = seq(2, 100, 10),
   N_1 = 1E3, N_2 = 1E3, sigma_1 = 1, sigma_2 = 1
-) %>% 
-  as_tibble() %>% 
+) %>%
+  as_tibble() %>%
   mutate(
-    var = map2_dbl(n_1,n_2, strat_var_sample, unique(N_1), unique(N_2), unique(sigma_1), unique(sigma_2)),
+    var = map2_dbl(n_1, n_2, strat_var_sample, unique(N_1), unique(N_2), unique(sigma_1), unique(sigma_2)),
     n_2 = factor(n_2)
-  ) %>% 
-  ggplot(aes(x = n_1, y = var, color = n_2)) + 
-  geom_point() + geom_line() +
+  ) %>%
+  ggplot(aes(x = n_1, y = var, color = n_2)) +
+  geom_point() +
+  geom_line() +
   ylab("Variance") +
   ggtitle("Two Strata Design Variance", subtitle = "For Varying Strata Sizes")
 ```
@@ -1634,8 +1635,10 @@ as_tibble(apiclus2)
 ## snum = school id
 ## fpc1 = school id number
 clus1_design <- svydesign(id = ~dnum, fpc = ~fpc, data = apiclus1)
-clus2_design <- svydesign(id = ~ dnum + snum, fpc = ~ fpc1 + fpc2,
-                          data = apiclus2)
+clus2_design <- svydesign(
+  id = ~ dnum + snum, fpc = ~ fpc1 + fpc2,
+  data = apiclus2
+)
 clus2_design
 ```
 
@@ -1886,7 +1889,7 @@ bpdf <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
 
 bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE)
 
-bpdf_design <- bpdf %>% 
+bpdf_design <- bpdf %>%
   as_survey_design(
     weights = WTMEC2YR,
     id = SDMVPSU,
@@ -1902,16 +1905,16 @@ Lumley doesn't tell us which variable name corresponds to the measurements
 indicated and I didn't see any documentation in the files included so I just
 guess here.
 ```{r}
-bpdf_design %>% 
+bpdf_design %>%
   mutate(
     sys_over_140 = (BPXSY1 > 140) * 1,
     dia_over_90 = (BPXDI1 > 90) * 1,
     hbp = (sys_over_140 + dia_over_90 == 2) * 1
-  ) %>% 
+  ) %>%
   summarize(
-    prop_hbp_one = 
+    prop_hbp_one =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
-    prop_hbp_two = 
+    prop_hbp_two =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
     prob_hbp = survey_ratio(hbp, n(), na.rm = TRUE, vartype = "ci", deff = TRUE)
   ) %>%
@@ -1925,22 +1928,23 @@ Included in the output above.
 d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
 
 ```{r}
-nhanes_ests <- bpdf_design %>% 
+nhanes_ests <- bpdf_design %>%
   mutate(
     sys_over_140 = (BPXSY1 > 140) * 1,
     dia_over_90 = (BPXDI1 > 90) * 1,
     hbp = (sys_over_140 + dia_over_90 == 2) * 1,
-    age_group = cut(RIDAGEYR, c(0,21,65,Inf)),
-    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male","Female"))
-  ) %>% 
-  group_by(sex,age_group) %>%
+    age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
+    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male", "Female"))
+  ) %>%
+  group_by(sex, age_group) %>%
   summarize(
-    prop_hbp_one = 
+    prop_hbp_one =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
-    prop_hbp_two = 
+    prop_hbp_two =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
     prob_hbp = survey_ratio(hbp, n(), na.rm = TRUE, vartype = "ci", deff = TRUE)
-  ) %>% ungroup()
+  ) %>%
+  ungroup()
 nhanes_ests
 ```
 
@@ -1948,33 +1952,35 @@ This produces a bunch of output, so I plot the high blood pressure result ---
 both high systolic and diastolic blood pressure -- below.
 
 ```{r}
-nhanes_ests %>% 
-  select(age_group, sex, prob_hbp, prob_hbp_low, prob_hbp_upp) %>% 
-  filter(!is.na(age_group)) %>% 
+nhanes_ests %>%
+  select(age_group, sex, prob_hbp, prob_hbp_low, prob_hbp_upp) %>%
+  filter(!is.na(age_group)) %>%
   ggplot(aes(x = age_group, y = prob_hbp, color = sex)) +
-  geom_pointrange(aes(ymin = prob_hbp_low, ymax = prob_hbp_upp), 
-                  position = position_dodge(width = .25)) +
+  geom_pointrange(aes(ymin = prob_hbp_low, ymax = prob_hbp_upp),
+    position = position_dodge(width = .25)
+  ) +
   ylab("% US Population with High Blood Pressure") +
-  xlab("Age Group") + 
+  xlab("Age Group") +
   ggtitle("Prevalence of High Blood Pressure in U.S. Across Age and Sex",
-          subtitle = "Data from NHANES 2003-2004") +
+    subtitle = "Data from NHANES 2003-2004"
+  ) +
   scale_y_continuous(labels = scales::percent)
 ```
 
 3.2 Repeat the sampling and estimation in Figure 3.4 1000 times.
 
 FYI the `sampling::UPtille` function takes a while so running this simulation
-1000 times takes a while
+1000 times takes a while.
 ```{r simulated_pps, cache = TRUE}
 one.sim <- function() {
   insample <- sampling::UPtille(election$p)
-  ppsample <- election[insample == 1,]
+  ppsample <- election[insample == 1, ]
   ppsample$wt <- 1 / ppsample$p
-  pps_design <- svydesign(id=~1, weight = ~wt, data = ppsample)
-  total <- svytotal(~Bush+Kerry+Nader, pps_design)
+  pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample)
+  total <- svytotal(~ Bush + Kerry + Nader, pps_design)
   std_err <- sqrt(diag(attr(total, "var")))
   ci <- confint(total)
-  out <- cbind(total,std_err,ci)
+  out <- cbind(total, std_err, ci)
 }
 total_sims <- replicate(10, one.sim())
 ```
@@ -1983,17 +1989,17 @@ a) Check that the mean of the estimated totals is close to the true population
 totals.
 
 ```{r pps_totals, eval = FALSE}
-estimated_totals <- as_tibble(t(rowMeans(total_sims[,1,]))) %>% 
+estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
   mutate(label = "Estimate")
 
-true_totals <- as_tibble(t(colSums(election[,c("Bush","Kerry","Nader")]))) %>% 
+true_totals <- as_tibble(t(colSums(election[, c("Bush", "Kerry", "Nader")]))) %>%
   mutate(label = "Truth")
 
-rbind(estimated_totals, true_totals) %>% 
-  gather(everything(), -label, key = "Candidate", value = "Vote Count") %>% 
-  spread(label,`Vote Count`) %>% 
-  gt::gt() %>% 
-  gt::fmt_scientific() %>% 
+rbind(estimated_totals, true_totals) %>%
+  gather(everything(), -label, key = "Candidate", value = "Vote Count") %>%
+  spread(label, `Vote Count`) %>%
+  gt::gt() %>%
+  gt::fmt_scientific() %>%
   gt::tab_header("Simulated Total Comparison")
 ```
 
@@ -2004,17 +2010,17 @@ true simulation standard error, that is, the standard deviation of the
 estimated totals.
 
 ```{r pps_stderrs, eval = FALSE}
-estimated_stderrs <- as_tibble(t(rowMeans(total_sims[,2,]))) %>% 
+estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
-true_stderr <- as_tibble(apply(total_sims,1,sd)) %>% 
+true_stderr <- as_tibble(apply(total_sims, 1, sd)) %>%
   mutate(label = "Truth")
 
-rbind(estimated_stderrs, true_stderr) %>% 
-  gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>% 
-  spread(label,`Vote Std.Err`) %>% 
-  gt::gt() %>% 
-  gt::fmt_scientific() %>% 
+rbind(estimated_stderrs, true_stderr) %>%
+  gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>%
+  spread(label, `Vote Std.Err`) %>%
+  gt::gt() %>%
+  gt::fmt_scientific() %>%
   gt::tab_header("Simulated Standard Error Comparison")
 ```
 
@@ -2022,9 +2028,10 @@ c) Estimate 95% confidence intervals for the population totals and compute the
 proportion of intervals that contain the true population value.
 
 ```{r pps_cis}
-totals <- unlist(true_totals[,1:3])
-prop_contained <- rowMeans((total_sims[,3,] < totals & total_sims[,4,] > totals) * 1)
-prop_contained 
+totals <- unlist(true_totals[, 1:3])
+prop_contained <- rowMeans((total_sims[, 3, ] < totals & 
+                              total_sims[, 4, ] > totals) * 1)
+prop_contained
 ```
 
 We see that the proportion contained by the interval is near the 95% nominal 
@@ -2059,15 +2066,42 @@ households.
 b) What would the strata and PSUs be for the single stage approximation to 
 the design?
 
-The strata would be the cross sectional
+I don't know. It isn't clear how to reconstruct Lumley's example given that
+the data is not available. Looking at the NHIS 
+[website](https://www.cdc.gov/nchs/nhis/sudaan.htm) it looks like the 
+strata and PSU information for a single stage approximation are given. 
+When looking for the same information for the NLYS data I don't 
+[see](https://www.nlsinfo.org/content/cohorts/nlsy97/other-documentation/errata/errata-nlsy97-round-15-release/calculating-design) equivalent instructions on how to construct a single stage 
+approximation. His description in the book here isn't very forthcoming either 
+but I'd guess that one could just concatenate the PSU and SSU labels and the 
+same for the strata and then use those in a one stage design. This doesn't look 
+exactly like what Lumley does in his example.
 
-
-3.4  The British Household Panel Survey is documented at 
-http://www.iser.essex.ac.uk/survey/bhps .
+3.4  The British Household Panel Survey (BHPS) is documented at 
+http://www.iser.essex.ac.uk/survey/bhps (this website is no longer accurate) .
 
 a) What are the stages of sampling, strata and the sampling units at each stage?
+
+The website given is no longer accurate. Clicking through the documentation of 
+the "Understanding Society" 
+[website](https://www.understandingsociety.ac.uk/documentation/mainstage/user-guides/main-survey-user-guide/study-design/) 
+it looks like the BHPS has been combined with other surveys. 
+When I look at more documentation,
+([1](https://www.understandingsociety.ac.uk/wp-content/uploads/documentation/user-guides/6614_main_survey_sample_design.pdf),
+[2](https://repository.essex.ac.uk/21094/1/bhps-harmonised-user-guide.pdf#page=6.75),
+[3](https://www.iser.essex.ac.uk/wp-content/uploads/bhps/documentation/volumes/5151userguide_vola.pdf)),
+the last of these being the most pertinent, I see a variety of designs by wave.
+It looks like the design was a two stage stratified sample where the sampling
+frame was the Postcode Address File for Great Britian, excluding Northern
+Ireland. 250 postcodes were chosen as the primary sampling unit, in the 
+second stage, "delivery points" which are roughly equivalent to addresses were
+then selected.
+
 b) What would the strata and PSUs be for the single stage approximation to
 the design?
+
+Again, my best guess is to concatenate the postcodes and delivery addresses
+to construct the single stage identifiers, and the same for the strata.
 
 
 3.5 Statistics New Zealand lists survey topics at 
@@ -2075,8 +2109,27 @@ http://www.stats.govt.nz/datasets/a-z-list.htm . Find the Household Labour Force
 Survey.
 
 a) What are the stages of sampling and the sampling units at each stage?
+
+Again, that site is no longer valid. The current help 
+[page](https://www.stats.govt.nz/help-with-surveys/list-of-stats-nz-surveys/about-the-household-labour-force-survey/)
+for the household labor survey simply says,
+
+> Approximately fifteen thousand (15,000) households take part in this survey
+every three months. A house is selected using a fair statistical method to
+ensure the sample is an accurate representation of New Zealand. Every person 
+aged 15 years or over living in a selected house needs to take part.
+
+A different [doc](https://www.stats.govt.nz/assets/Uploads/Retirement-of-archive-website-project-files/Methods/Household-Labour-Force-Survey-sources-and-methods-2016/hlfs-sources-and-methods-2016.pdf#page=11.08)
+I found on google searching listed the 2016 survey design as a 2 stage 
+design where samples are drawn from strata in the first stage. The PSU's 
+are "meshblocks" which appear to be the NZ equivalent of a U.S. 
+census block / tract.
+
+
 b) What would the strata and PSUs be for the single stage approximation to
 the design?
+
+Same answer here as previously.
 
 3.6 This exercise uses the Washington State Crime data for 2004 as the 
 population. The data consists of crime rates and population size for the
@@ -2087,15 +2140,38 @@ a) Take a simple random sample of 10 counties from the state and use all the
 data from the sampled counties. Estimate the total number of murders and
 burglaries in the state.
 
+```{r wacrime_36a}
+wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>% 
+  filter(Year == "2004") %>% 
+  mutate(
+    murder_and_crime = `Murder Total` + `Burglary Total`,
+    state_pop = sum(Population)
+         ) 
+county_list <- unique(wa_crime_df$County)
+county_sample <- sample(county_list, 10)
+wa_crime_df %>% 
+  filter(County %in% county_sample) %>% 
+  as_survey_design() %>% 
+  summarize(total = survey_total(murder_and_crime, vartype = "ci"))
+```
+
 
 b) Stratify the sampling so that King County is sampled with 100% probability
 together with a simple random sample of five other counties. Estimate the
 total number of of murders and burglaries in the state and compare to the
 previous estimates.
 
+```{r wacrime_36b}
+county_list[-which(county_list == "King" | county_list == "KING")]
+```
+
 c) Take simple random samples of five police districts from King County and
 five counties from the rest of the state. Estimate the total number of murders
 and burglaries in the state and compare to the previous estimates.
+
+```{r wacrime_36b}
+
+```
 
 d) Take a probability proportional to size (PPS) sample of 10 police districts.
 Estimate the total number of murders and burglaries in the state and compare
