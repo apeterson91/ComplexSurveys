@@ -28,6 +28,9 @@ library(survey)
 library(patchwork)
 library(RSQLite)
 library(DiagrammeR)
+library(lattice)
+library(quantreg)
+library(sf)
 theme_set(theme_bw() + theme(
   text = element_text(size = 18),
   strip.background = element_blank()
@@ -1907,7 +1910,7 @@ guess here.
 ```{r}
 bpdf_design %>%
   mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1,
+    sys_over_140 = (BPXSAR > 140) * 1,
     dia_over_90 = (BPXDI1 > 90) * 1,
     hbp = (sys_over_140 + dia_over_90 == 2) * 1
   ) %>%
@@ -1930,7 +1933,7 @@ d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
 ```{r}
 nhanes_ests <- bpdf_design %>%
   mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1,
+    sys_over_140 = (BPXSAR > 140) * 1,
     dia_over_90 = (BPXDI1 > 90) * 1,
     hbp = (sys_over_140 + dia_over_90 == 2) * 1,
     age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
@@ -2027,7 +2030,7 @@ rbind(estimated_stderrs, true_stderr) %>%
 c) Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
-```{r pps_cis}
+```{r pps_cis, eval = FALSE}
 totals <- unlist(true_totals[, 1:3])
 prop_contained <- rowMeans((total_sims[, 3, ] < totals & 
                               total_sims[, 4, ] > totals) * 1)
@@ -2169,7 +2172,7 @@ c) Take simple random samples of five police districts from King County and
 five counties from the rest of the state. Estimate the total number of murders
 and burglaries in the state and compare to the previous estimates.
 
-```{r wacrime_36b}
+```{r wacrime_36c}
 
 ```
 
@@ -2204,7 +2207,7 @@ site. Compare the standard errors from these two approximations to the standard
 errors from the single-stage with replacement approxmiation and to the true
 simulation standard error.
 
-3.11 Since 1999, NHANES has been conducting suveys continuously with data 
+3.11 Since 1999, NHANES has been conducting surveys continuously with data 
 released on a 2 year cycle. Each data set includes a weight variable for
 analyzing the two-year data; the weights add to the size of the US adult, 
 civilian, non-institutionalized population.
@@ -2242,6 +2245,8 @@ visualizing and interacting with data of all types -- survey included. What's
 more, it isn't always clear how he produces the charts in the chapter.
 Consequently I've done my best to reproduce the same charts, or a chart I'd
 consider appropriate for the question / survey at hand in the following charts.
+
+TODO: Talk about gsurvey.
 
 ## Plotting a Table
 
@@ -2281,6 +2286,446 @@ medians %>%
   ))
 ```
 
+## One Continuous Variable
+
+Lumley argues that the most straightforward graphical displays for a single
+continuous variable are boxplots, cumulative distribution function (cdf) plots 
+and survival curves. I think histograms are also useful but we'll get to that
+shortly.
+
+Below I reproduce Figure 4.6 from the text
+in which Lumley demonstrates the difference between the weighted and unweighted
+CDF's of the California school data demonstrating that, indeed, the design 
+based estimate is closer to the population value than the unweighted, naive
+estimate of the stratified design. This should all intuitively make sense.
+My only complaint would be that the uncertainty of the cdf isn't visualized
+when that should be just as easily accessible. I made a cursory investigation
+to see if these data were available in the `svycdf` object but they were not. 
+
+
+```{r svycdf}
+cdf.est <- svycdf(~enroll + api00 + api99, dstrata)
+
+cdf.pop <- ecdf(apipop$enroll)
+
+cdf.samp <- ecdf(apistrat$enroll)
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+plot(cdf.pop, do.points = FALSE, xlab = "enrollment",
+     ylab = "Cumulative probability", 
+     main = "Cumulative Distribution of California School Size",
+     sub = "Reproduces Lumley Fig 4.6", lwd = 1)
+
+lines(cdf.samp, do.points = FALSE, lwd = 2)
+lines(cdf.est[[1]], lwd = 2, col.vert = "grey60", col.hor = "grey60",
+      do.points = FALSE)
+legend("bottomright", lwd = c(1,2,2), bty = "n", 
+       col = c("black", "grey60", "black"), 
+       legend = c("Population", "Weighted estimate", "Unweighted Estimate"))
+```
+Next Lumley plots an adjusted 
+[kaplan meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator) 
+curve using `svykm()` on the National Wilms Tumor Study data. Unfortunately
+he doesn't show how to create the design object and I find no mention of it
+elsewhere in the book. I made a guess and it seems to be accurate. Note
+that I obtained the national wilms tumor study data from the [`survival`](https://cran.r-project.org/web/packages/survival/index.html) 
+package.
+
+```{r svykm}
+dcchs <- svydesign(ids = ~1, data = nwtco)
+scurves <- svykm(Surv(edrel / 365.25, rel) ~ histol, dcchs)
+plot(scurves)
+```
+The interpretation of this graph is that relapse (into cancer) appears to 
+occur within about three years, if at all. The top line shows the survival
+for those with a favorable histology classification with an even better
+survival rate.
+
+Lumley makes a note here describing how the sampling weights make a 
+large difference in the estimate because the design is a case cohort sample.
+That being said, I don't really see the difference when I compare his figure
+to mine created with an equal probability sample... An error here perhaps.
+
+
+#### Boxplots
+
+Lumley describes the typical boxplots as
+
+> based on the quartiles of the data: the box shows the median and first and 
+third quartiles, the whiskers extend out to the last observation within 1.5
+interquartile ranges of the box ends, and all points beyond the whiskers are 
+shown individually.
+
+
+This is as good a summary as any, I'll only note that the median is the line 
+within the interior of the box and the first and third quartile define the 
+boundaries of the box. It's (somewhat) easy to image how Lumley estimates
+these values, as he has already introduced the `svyquantile()` function ---
+this should be a straightforward application of that function.
+
+I reproduce Figure 4.10 from the text using the nhanes data and design object
+created in answering the questions for chapter 3. His code is equivalent.
+
+```{r boxplots}
+## Lumley's code
+#nhanes <- svydesign(id = ~SDMVPSU, strat = ~SDMVSTRA,
+#                    weights = ~WTMEC2YR, data = both, nest = TRUE)
+
+## I use the bpdf design from the chapter 3 questions
+nhanes <- bpdf_design %>% 
+  mutate(
+    age_group = cut(RIDAGEYR, c(0, 20, 30, 40, 50, 60, 80, Inf)),
+  )
+svyboxplot(BPXSAR ~ age_group, subset(nhanes, BPXSAR > 0), col = "gray80",
+           varwidth = TRUE, ylab = "Systolic BP (mmHg)", xlab = "Age")
+```
+The plot shows the distribution in blood pressure across the different age 
+groups. I already showed how I visualized this previously, but it is nice
+to know how to do something multiple ways. In general, our observation shows
+an increase in systolic blood pressure medians and third quartiles across age.
+
+
+#### Graphs based on the density
+
+Histograms and kernel density estimators both visualize the probability
+distribution function(pdf) of a given dataset. Confusingly, perhaps, there 
+is no pdf to estimate in finite population inference because the sampling
+is random instead of the data. Still, the analogous effort can be made where
+a given proportion is estimated for some number of bins of the variable of 
+interest. Instead of estimating a naive proportion, there's now a sample based
+proportion. I reproduce Lumley's Figure 4.12 below demonstrating how this 
+works.
+
+```{r svyhist}
+svyhist(~BPXSAR, subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0), main = "",
+        col="grey80", xlab="Systolic BP (mmHg)")
+lines(svysmooth(~BPXSAR,  nhanes, bandwidth = 5,
+                subset = subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0)), lwd = 2)
+```
+
+This looks considerably different then the naive estimate, again showcasing
+the need for taking the design into account.
+
+```{r naive_hist}
+hist(bpdf_design$variables$BPXSAR, xlab = "Systolic BP (mmHg)",
+     main = "Naive Distribution of Blood Pressure")
+```
+
+
+#### Two Continuous Variables
+
+Where the design could be used to adjust the raw sample summaries to adjust
+for the design with one variable, two variable visualizations make this much
+more difficult as there is no way to incorporate the design information into
+the presented estimate. An additional dimension has to be used to illustrate
+the design information.
+
+
+#### Scatterplots
+
+
+To that end, Lumley uses a bubbleplot with the size of the "bubbles" 
+proportional to the sampling weight. This way, the viewer can identify which 
+points should be considered as "more" or less impactful in terms of representing 
+the population. I reproduce part of Figures 4.13 - 4.15 from the text below, 
+for those plots in which Lumley includes the code. plots the systolic and 
+diastolic blood pressure from the NHANES design.
+
+
+```{r}
+#TODO(petersonadam): Try plotting the api data here too
+par(mfrow = c(1, 2))
+svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "bubble", 
+        xlab = "Diastolic pressure (mmHg)",
+        ylab = "Systolic pressure (mmHg)")
+svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "transparent",
+        pch = 19, alpha = c(0, 0.5), 
+        xlab = "Diastolic pressure (mmHg)",
+        ylab = "Systolic pressure (mmHg)")
+```
+
+As Lumley notes, this is a case in which the sampling weights --- bubble size 
+--- is not particularly informative, as we don't see any particularly obvious 
+pattern relating the size of the bubbles to the two variables of interest. 
+Turning to the shading plot, though we can now see more than just the "blob"
+in the first plot, there's still no apparent pattern between the 
+bubble size and the two variables to identify.
+
+Below, I include Lumley's "subsample" method, which draws a simple random
+sample from the target population by using the provided sampling probabilities.
+Lumley reccomends looking at 2 or three iterations of a subsample plot
+in order to ensure that any features visualized are not "noise" from the 
+sampling process.
+
+```{r subsample}
+svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "subsample", 
+        sample.size = 1000,
+        xlab = "Diastolic pressure (mmHg)",
+        ylab = "Systolic pressure (mmHg)")
+```
+#### Aggregation and smoothing
+
+While less of an issue than it was at the time of Lumley's writing, 
+aggregating and smoothing across points makes it easier to condense the
+number of sample points in a visualization to reduce the memory required to
+visualize all the points in the sample. In a design setting it also provides
+an opportunity to incorporate the design information into a visualization
+specific estimate.
+
+
+Lumley's first example of this is a hexplot - a plot where a grid of hexagons
+is created and sized according to the number of points within the hex-bin.
+
+```{r hexplot}
+svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "hex", legend = 0, 
+        xlab = "Diastolic pressure (mmHg)",
+        ylab = "Systolic pressure (mmHg)")
+```
+
+This is perhaps the best visualization of the data thus far, where the "blob"
+is still apparent but outliers are still visible and a more concise summary
+of the data is easily visible.
+
+
+#### Scatterplot smoothers
+
+Lumley next describes how to take the discrete estimates examining blood
+pressure as a function of age and smooth them when both variables are 
+continuous. The code below shows how to do this by using the `svyplot()` 
+function using quantile regression methods from the 
+[`quantreg`](https://cran.r-project.org/web/packages/quantreg/index.html) 
+package. Mean estimates can also be obtained by using `method = 'locpoly'`.
+
+
+```{r scatterplot_smoother}
+adults <- subset(nhanes, !is.na(BPXSAR))
+a25 <- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
+                 quantile = .25, df = 4)
+a50<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
+                 quantile = .5, df = 4)
+a75<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
+                 quantile = .75, df = 4)
+a10<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
+                 quantile = .1, df = 4)
+a90<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
+                 quantile = .9, df = 4)
+plot(BPXSAR ~ RIDAGEYR, data = nhanes, type = "n", ylim = c(80, 200),
+     xlab = "Age", ylab = "Systolic Pressure")
+lines(a50, lwd = 3)
+lines(a25, lwd = 1)
+lines(a75, lwd = 1)
+lines(a10, lty = 3)
+lines(a90, lty = 3)
+legend("topleft", legend = c("10%,90%", "25%, 75%", "median"),
+       lwd = c(1, 1, 3), lty = c(3, 1, 1), bty = "n")
+```
+
+#### Conditioning Plots
+
+A conditioning plot is effectively a scatter plot with a third 
+variable fixed. This third variable is then displayed in the facet title of the 
+plot. In Lumley's text he shows how to do this using a call to the 
+`svycoplot()` function to recreate the top half of Figure 4.20. Of note,
+the additional `hexscale` argument can be fed the `"absolute"` argument to
+make the scales comparable between panels - by default the scales are
+facet specific, though the data (for a continuous facet) has a ~50% overlap so
+the scales are not dramatically different.
+
+
+```{r svycoplot}
+svycoplot(BPXSAR ~ BPXDAR | equal.count(RIDAGEMN), 
+          style = "hex",  # or "transparent" for shaded hexs,
+          # hexscale = "absolute" # for fixed scales across facets.
+          design = subset(nhanes, BPXDAR > 0), xbins = 20,
+          strip = strip.custom(var.name = "AGE"),
+          xlab = "Diastolic pressure (mm Hg)",
+          ylab = "Systolic pressure (mm Hg)"
+)
+```
+
+## Maps
+
+### Design and Estimation Issues
+
+The final section in this chapter looks at how to visualize survey data 
+spatially across a map. Since many surveys contain geographic information
+in both their sampling design and the questions they seek to answer, it 
+makes sense that one might want to visualize estimates at some geographic
+scale.
+
+Lumley uses the `maptools` R package to take estimates computed
+using techniques/functions already demonstrated and visualize them on maps.
+
+Since maptools isn't available on CRAN at the current time of writing, I'll
+use the [sf package](https://r-spatial.github.io/sf/) and `ggplot2`.
+
+
+Below I reproduce Figure 4.21 from the text using these packages with
+the same design based estimates in the text. The data was procured from
+Lumley's [website](https://r-survey.r-forge.r-project.org/svybook/) --- 
+search for "BRFSS".
+
+```{r}
+states <- read_sf("Data/BRFSS2007/brfss_state_2007_download.shp") %>% 
+  arrange(ST_FIPS)
+bys <- svyby(~X_FRTSERV, ~X_STATE, svymean,
+             design = subset(brfss, X_FRTSERV < 99999))
+state_fruit_servings <- states %>% 
+  select(ST_FIPS) %>% 
+  st_drop_geometry() %>% 
+  left_join(bys, by = c("ST_FIPS" = "X_STATE")) %>% 
+  mutate(geometry = states$geometry) %>% 
+  st_as_sf()
+  
+state_fruit_servings %>% 
+  ggplot() + 
+  geom_sf(aes(fill = X_FRTSERV / 100)) +
+  theme_void() +
+  theme(legend.title = element_blank()) +
+  ggtitle("Servings of fruit per day, from BRFSS 2007")
+```
+
+
+```{r brfss_fruit_age}
+hlth <- brfss %>% 
+  as_survey_design() %>% 
+  mutate(agegp = cut(AGE, c(0, 35, 50, 65, Inf)),
+         state = X_STATE,
+         covered = (HLTHPLAN == 1) * 1 ) %>% 
+  group_by(agegp, state) %>% 
+  summarize(
+    health_coverage = survey_mean(covered)
+  ) %>% 
+  ## Formatting
+  mutate(Age = case_when(agegp == "(0,35]" ~ "<35",
+                         agegp == "(35,50]" ~ "35-50",
+                         agegp == "(50,65]" ~ "50-65",
+                         agegp == "(65,Inf]" ~ "65+"))
+
+
+
+insurance_coverage <- states %>% 
+  select(ST_FIPS,geometry) %>% 
+  left_join(hlth, by = c("ST_FIPS" = "state")) %>% 
+  st_as_sf()
+
+insurance_coverage %>% 
+  ggplot(aes(fill = health_coverage)) + 
+  geom_sf() +
+  facet_wrap(~Age) +
+  theme_void()
+  theme(legend.title = element_blank()) +
+```
+
+Lumley then shows two plots with insurance coverage at the state level. 
+Looking at the 
+[code](https://r-survey.r-forge.r-project.org/svybook/maps-webpage.R) he posted
+on the web it isn't clear to me what he's estimating that's different here as
+I don't see any calls to any of the survey functions. Consequently,
+I've just created some fake simulated data and created a plot with the 
+equivalent data.
+
+```{r city_data}
+cities <- read_sf("Data/BRFSS2007/BRFSS_MMSA_2007.shp") %>% 
+  filter(NAME != "Columbus") %>% 
+  transmute(Insurance = cut(rbeta(n(),1,1),c(0,0.25,.5,.75,1)))
+
+marginal_insurance <- brfss %>% 
+  as_survey_design() %>%
+  mutate(
+    covered = (HLTHPLAN == 1) * 1,
+    state = X_STATE,
+    ) %>% 
+  group_by(state) %>% 
+  summarize(
+    health_coverage = survey_mean(covered)
+  ) %>% ungroup()
+
+map_data <- states %>% 
+  select(ST_FIPS, geometry) %>% 
+  left_join(marginal_insurance, by = c("ST_FIPS" = "state")) %>% 
+  st_as_sf()
+
+ggplot() +
+  geom_sf(data = map_data, aes(fill = health_coverage)) +
+  geom_sf(data = cities, aes(color = Insurance)) +
+  theme_void() +
+  theme(legend.title = element_blank()) +
+  ggtitle("Insurance Coverage - from BRFSS and Fake Data")
+```
+
+## Questions
+
+1. Draw boxplots of body mass index by race/ethnicity and by sex using the 
+CHIS 2005 data introduced in Chapter 2.
+
+```{r chis_bmi_race}
+svyboxplot(bmi_p ~ racehpr, chis, main = "BMI By Race/Ethnicity")
+```
+
+```{r chis_bmi_sex}
+svyboxplot(bmi_p ~ srsex, chis, main = "BMI BY Sex")
+```
+
+2. Using the code in Figure 3.8 draw a barplot of the quantiles of income
+and compare it to the dotchart in Figure 3.9. What are some advantages and
+disadvantages of each display.
+
+```{r}
+```
+
+3. Use `svysmooth()` to draw a graph showing change in systolic and diastolic
+blood pressure over time in the NHANES 2003-2004 data. Can you see the change
+to isolated systolic hypertension in old age that is shown in Figure 4.5.
+
+```{r}
+plot(svysmooth(BPXSAR ~ RIDAGEYR, nhanes))
+```
+
+
+4. With the data from the SIPP 1996 panel draw the cumulative distribution 
+function  densityfunction, a histogram and a boxplot of total household income.
+Compare these graphs for their usefulness in showing the distribution of
+income.
+
+```{r}
+```
+
+5. With the data from the SIPP 1996 panel draw a graph showing amount of rent 
+(`tmthrent`)  and proportion of income paid to rent. You will want to exclude
+some outlying households that report much higher rent than income.
+
+6. Using data from CHIS 2005 (see section 2.3.1) examine how body mass index
+varies with age as we did with blood pressure in this chapter.
+
+```{r}
+plot(svysmooth(bmi_p ~ srage_p, chis), 
+     xlab = "Age", ylab = "BMI",
+     main = "BMI vs. Age (CHIS data)")
+```
+
+We see a very distinctive U-shape - with middle aged indviduals - 50 to 60 year
+olds - having the highest average BMI, but the young and old having lower
+BMI's.
+
+7. The left-hand panel of Figure 3.3 shows an interesting two-lobed pattern. 
+Can you find what makes these lobes?
+
+8. Set up a survey design for the BRFSS 2007 data as in Figure 3.7. BRFSS
+measured annual income (`income2`) in categories < \$10K, \$10-15k \$20-25k,
+\$25-35k, \$35-50k, \$50-75k, > \$75k and race (`orace`) :white,black, asian,
+native hawaiian/pacific island, native american, other.
+
+* Draw a graph of income by race.
+* Draw maps showing the geographical distribution of income and of racial 
+groups.
+* Draw a set of maps examining whether the geographical distribution of income
+differs by race.
+
+9. Explore the impact on the graphs in Figure 4.18 of changes in the amount of 
+smoothing, by altering the `df` argument to the code in Figure 4.19
+
 # Chapter 5: Ratios and Linear Regression
 
 Lumley identifies two main uses for regression in analyzing complex surveys:
@@ -2295,6 +2740,23 @@ philosophy and consequently no model based assumptions are needed in order to
 compute valid 95% confidence intervals. However, model choice still matters
 insofar as one's goal is to precisely estimate a relationship or population mean
 or total.
+
+In statistical parlance, Lumley is using 
+[GEE](https://en.wikipedia.org/wiki/Generalized_estimating_equation) - 
+or generalized estimating equations to fit models, which only require
+assumptions about the moments of the underlying data distribution, rather than
+the family of the distribution.
+
+My take is that this approach also allows for more flexibility in how the 
+variance of the model can be estimated. Since the variance associated with a 
+complex design is a function of the design itself, GEE makes it easier
+to structure the estimating equations in such a way that the variance
+computation corresponds to the design. In fact, Lumley explicitly notes 
+in section 5.2.1 that the heteroskedastic / 
+[sandwhich based variance estimators](https://stats.stackexchange.com/questions/50778/sandwich-estimator-intuition)
+which came out of GEE are used by the `survey` package, with special
+handling for combining variance within/across strata.
+
 
 ## 5.1 Ratio Estimation
 
@@ -2321,7 +2783,7 @@ decreases proportional to $\frac{1}{\sqrt{n}}$.
 
 ### Ratios for subpopulation estimates
 
-Lumley notes that in the case where individual - not aggregate - data are
+In the case where individual - not aggregate - data are
 available the ratio being estimated is simply a proportion. This is the same
 logic for which subpopulation estimates had been calculated previously in
 [Chapter 2:Simple Random Sample] via the `svyby()` function. These estimates
@@ -2451,9 +2913,446 @@ distribution and not the shape itself).
 
 ## Linear Regression
 
-Lumley goes on to identify
+A quick review of the moment assumptions for linear regression - which is all
+that are needed for designed based estimation. 
+
+If we have random response variable $Y$ and explanatory variable $X$ then linear
+regression is looking at the relationship between the expectation of $Y$ and 
+$X$:
+$$
+E[Y] = \alpha + X \beta,
+$$
+
+Where $\alpha$ is a constant offset, also called the intercept and $\beta$ is
+the slope coefficient that describes the change in $E[Y]$ per unit change in 
+$X$. Here I'm referring to $X$ and $\beta$ as singular variables but they
+could also be a matrix and vector of explanatory variables and slope 
+coefficients, respectively. The variance of the response variable, $Y$ is 
+assumed to be constant, i.e. $V[Y] = \sigma^2$, unless otherwise modeled.
+
+Following the standard OLS estimation procedure, we'd normally 
+minimize the squared error and Lumley notes that if we have the complete 
+population data, we'd be finished at that:
+
+$$
+RSS = \sum_{i=1}^{N} (Y_i - \alpha X_i\beta)^{2}.
+$$
+
+Given that we're typically dealing with (complex) samples though, we have
+to adjust the estimates to account for the weighting:
+
+
+$$
+\hat{RSS} = \sum_{i=1}^{n} \frac{1}{\pi_i}(Y_i - \alpha - X_i \beta)^2,
+$$
+
+so each error term is up weighted according to its sampling probability.
+ 
+
+### Regression Estimation of Population Totals
+
+Lumley's ratio estimator of a population total described previously derives 
+from the linear regression model with a single predictor and no intercept. 
+The *separate ratio estimator*, similar to the 
+[cell means model](https://online.stat.psu.edu/stat502/lesson/4/4.3) 
+estimates a ratio for each stratum and the estimate of the total is the 
+sum of the denominator for all strata. Formally,
+
+$$
+E[Y_i] = \beta_k \times X_i \times \{i \in \text{ stratum } k\},
+$$
+
+where $\beta_k$ is the ratio for stratum $k$ estimates the given quantity. This
+setup can provide more precise estimates than the single ratio estimator when
+the sample size gets large and the strata are able to better explain the outcome
+variable. However, if the strata don't have any correlation with the outcome
+then the standard errors increase, due to the need to estimate the extra
+parameters.
+
+
+THIS EXAMPLE DOESN'T MAKE COMPLETE SENSE.
+Lumley illustrates this latter phenomenon with the California school data - 
+using the percentage of english language learners as a predictor of the 
+overall number of students taking the api tests.
+
+
+```{r separate_ratio_estimator}
+sep <- svyratio(~api.stu, ~enroll, strat_design, separate = TRUE)
+com <- svyratio(~api.stu, ~enroll, strat_design)
+stratum_totals <- list(E = 1877350, H = 1013824, M = 920298)
+predict(sep, total = stratum_totals)
+```
+
+```{r common_ratio_estimator}
+predict(com, total = sum(unlist(stratum_totals)))
+```
+We see the common ratio has a smaller standard error than the separate ratio
+estimator.
+
+
+```{r ratio_api_stu}
+svyby(~api.stu, ~stype, design = dstrata, denom = ~enroll, svyratio)
+```
+
+**Incomes in Scotland**
+
+Lumley works through an example looking at household incomes across Scotland
+from their national household survey. Unfortunately both the dataset subset he 
+provides at his [website](https://r-survey.r-forge.r-project.org/svybook/) to 
+and the full dataset he [links to](https://www.restore.ac.uk/PEAS/exemplar2.php)
+don't have the variables he uses in his example code in Figure 5.7. For 
+example the code he provides is filtered using an ADULTH variable which isn't 
+found in either dataset.
+
+```{r scotland_incomes}
+load("Data/SHS/shs.rda") # Lumley's website data
+colnames(shs$variables)
+load("Data/SHS/ex2.RData") # PEAS "full Data" website
+colnames(shs)
+```
+
+Consequently, I won't reproduce this example here, except to say that he uses
+the example to illustrate how oversampling certain strata (poorer households)
+can improve the precision associated with the household income estimate and
+that using the population information increased the precision of the weekly
+household income estimate via linear regression -- for those sub-populations for
+which population information is available.
+
+
+**US Elections**
+
+Similarly it doesn't look like the dataset included in the current `survey` R
+package has data for the 2008 election - I only see Bush / McCain vote totals.
+
+
+```{r election_colnames}
+data(elections)
+colnames(election)
+```
+
+Consequently I can't do the analysis he shows predicting 2008 votes
+using 2000 votes. It'll hopefully suffice to say that in theme with the
+content for the chapter, that because these values are correlated ---
+2000 vote % for republican candidate and 2008 vote % for republican candidate 
+--- it stands to reason that we can reduce the variance of the resulting
+estimate rather than using the 2008 data alone.
+
+
+### Confouding and other criteria for model choice
+
+Lumley describes three categories for describing why a predictor might be 
+included in a regression, noting that this may help the model fit better and
+thus aid in reducing bias from a probability sample that results from, say
+non-response.
+
+1. Exposure of interest: If we're interested in a specific variable's impact
+on a variable, it makes sense to include that in a model to estimate the
+relationship.
+
+2. Confounding variables: A variable may not be of primary interest, but may
+be associated with both the outcome variable and exposure of interest. 
+Consequently, this will need to be *adjusted for* in order to isolate the 
+effect of interest.
+
+3. Precision variables: These are, again, associated with the outcome variable
+of interest, but not associated with the exposure of interest. However, 
+because of their association alone, they can increase the precision with
+which the exposure effect is estimated.
+
+Lumley goes on to describe methods for model selection which I'll leave for the
+text.
+
+
+### Linear models in the `survey` package
+
+
+**Example:Dietary sodium and potassium and blood pressure**
+
+
+```{r sodium_nhanes_merge}
+demo <- haven::read_xpt("data/nhanesxpt/demo_c.xpt")[, c(1:8, 28:31)]
+bp <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
+bm <- haven::read_xpt("data/nhanesxpt/bmx_c.xpt")[, c("SEQN", "BMXBMI")]
+diet <- haven::read_xpt("data/nhanesxpt/dr1tot_c.xpt")[, c(1:52, 63,64)]
+nhanes34 <- merge(demo, bp, by = "SEQN")
+nhanes34 <- merge(nhanes34, bm, by = "SEQN")
+nhanes34 <- merge(nhanes34, diet, by = "SEQN")
+
+demo5 <- haven::read_xpt("data/nhanesxpt/demo_d.xpt")[, c(1:8,39:42)]
+bp5 <- haven::read_xpt("data/nhanesxpt/bpx_x.xpt")
+
+bp5$BPXSAR <- rowMeans(bp5[,c("BPXSY1","BPXSY2","BPXSY3","BPXSY4")], 
+                       na.rm = TRUE)
+bp5$BPXDAR <-  rowMeans(bp5[,c("BPXDI1","BPXDI2","BPXDI3","BPXDI4")], 
+                       na.rm = TRUE)
+bm5 <- haven::read_xpt("data/nhanesxpt/bmx_d.xpt")[, c("SEQN", "BMXBMI")]
+diet5 <- haven::read_xpt("data/nhanesxpt/dr1tot_d.xpt")[, c(1:52,64,65)]
+
+
+nhanes56 <- merge(demo5, bp5, by = "SEQN")
+nhanes56 <- merge(nhanes56, bm5, by = "SEQN")
+nhanes56 <- merge(nhanes56, diet5, by = "SEQN")
+
+nhanes <- rbind(nhanes34, nhanes56)
+nhanes$fouryearwt <- nhanes$WTDRD1 / 2
+# I added the two lines below to make graphing the
+# smooth plot easier
+nhanes$sodium <- nhanes$DR1TSODI / 1000 
+nhanes$potassium <- nhanes$DR1TPOTA / 1000 
+
+des <- svydesign(id = ~SDMVPSU, strat = ~SDMVSTRA, weights = ~fouryearwt,
+                 nest = TRUE, data = subset(nhanes, !is.na(WTDRD1)))
+
+des <- update(des, sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000)
+des
+```
+
+Lumley uses the following plot --- examining systolic blood pressure as a 
+function of daily sodium intake --- to motivate the need to adjust for 
+confounders. As we can see below in the reproduced Figure 5.10, there doesn't
+appear to be much a relationship between sodium intake and average blood 
+pressure. Lumley argues that we observe this simpler relationship because of 
+the association between sodium and blood pressure is confounded by age.
+
+```{r svysmoothplot}
+plot(BPXSAR ~ sodium, data = nhanes, type = "n")
+points(svyplot(BPXSAR ~ sodium, design = des, style = "transparent", xlab = 
+          "Dietary Sodium (g/day)", ylab = "Systolic Blood Pressure (mm Hg)"))
+lines((svysmooth(BPXSAR ~ sodium, des)))
+```
+To test this hypothesis, Lumley first visualizes the three variables using the
+conditional plot demonstrated previously.
+
+
+```{r nacl_coplot}
+svycoplot(BPXSAR ~ sodium | equal.count(RIDAGEYR), des,
+          style = "hexbin",
+          xlab = "Dietary Sodium (g/day)",
+          ylab = "Systolic BP (mmHg)",
+          strip = strip.custom(var.name = "Age"))
+```
+
+In the above plot we see a greater indication that as dietary sodium increases
+, so too does systolic blood pressure. 
+
+To more formally test the hypothesis, Lumley fits several models with
+these variables included. The first two just include (1) sodium and potassium
+and (2) sodium, potassium and Age.
+
+
+```{r nacl_model0}
+model0 <- svyglm(BPXSAR ~ sodium + potassium, design = des)
+summary(model0)
+```
+
+```{r nacl_model1}
+model1 <- svyglm(BPXSAR ~ sodium + potassium + RIDAGEYR, design = des)
+summary(model1)
+```
+
+As we can see, the sodium and potassium coefficient signs in the first
+model switch direction once age is included in the second model, demonstrating
+that the two variables are associated with both age and systolic blood pressure.
+The second model makes more sense intuitively, because we expect systolic 
+blood pressure to increase, on average, as a function of sodium intake.
+
+Lumley adds a few more possible confounders to `model2` and then tests 
+to see whether the effects of daily dietary sodium and potassium on systolic 
+blood pressure are significantly different than zero using the `regTermTest()` 
+function. 
+
+```{r nacl_model2}
+model2 <- svyglm(BPXSAR ~ sodium + potassium + RIDAGEYR + RIAGENDR + BMXBMI,
+                 design = des)
+summary(model2)
+```
+
+```{r nacl_test_models}
+regTermTest(model2, ~potassium + sodium, df = NULL)
+```
+
+The test is formally examining whether a model with these terms is more 
+likely, given the data, then one without, with the null hypothesis assuming
+that the extra terms are unneccessary. As we can see, the model is 
+very unlikely to fit so well with the two extra terms, so there's evidence to
+support the association between the terms and blood pressure.
+
+
+Lumley digs into further details of why the effect is so small --- 1 gram
+of sodium (2.5 grams of salt) is a lot of salt required to increase systolic
+blood presssure "only" .43 mmHg. Some explanations include measurement error,
+missing data, and model misspecification. Lumley examines the last of these 
+by displaying the model diagnostic plots. Model misspecification can be
+examined by identifying any association between the partial residuals and
+the observed sodium intake. I replicate Lumley's code below.
+
+```{r partial_residual_plot}
+par(mfrow = c(1, 2))
+plot(as.vector(predict(model1)), resid(model1), 
+     xlab = "Fitted Values", ylab = "Residuals")
+nonmissing <- des[-model1$na.action]
+plot(nonmissing$variables$sodium,
+     resid(model1, "partial")[,1],
+     xlab = "Sodium", 
+     ylab = "Partial Residuals")
+```
+
+
+```{r nacl_termplot}
+nonmissing <- des[-model1$na.action]
+par(mfrow = c(1, 2))
+plot(model1, panel = make.panel.svysmooth(nonmissing))
+termplot(model1, data = model.frame(nonmissing),
+         partial = TRUE, se = TRUE, smooth = make.panel.svysmooth(nonmissing))
+```
+
+```{r}
+int1 <- svyglm(BPXSAR ~ (sodium+potassium)*I(RIDAGEYR-40) + RIAGENDR + BMXBMI,
+               design = des)
+summary(int1)
+```
+### Is Weighting Needed in a Regression Model ?
+
+Lumley caps off this chapter asking whether we even need to bother with the
+specialized weighting built into the `survey` package. His answer is worth
+digging into:
+
+> Since regression models use adjustment for confounders as a way of removing 
+distorted associations between exposure and response, it is plausible that a
+regression model might not need sampling weights.
+
+A key assumption here is whether the population we're estimating is stable 
+across the population(s) represented by our dataset. The naive, biased 
+population that our sample represents when unweighted, or the "target" 
+population our sample represents when reweighted. A follow-up question would
+ask whether we could even estimate the relationship as desired, if the 
+effect is heterogeneous across populations. Lumley cites [@dumouchel1983using]
+for further discussion on this topic.
+
+I have more to say here --- Thinking of this article [gelman2007struggles] ---, 
+but it may not fit in these notes. For now I'll end with Lumley's two 
+limitations for regression models when not using weights:
+
+1. Some important variables used in constructing the weights may not be 
+available,
+
+2. Further, the important variables mentioned above may not be suitable for 
+including in the model.
+
+Lumley urges caution in this regard, advising that even a small amount of bias
+introduced from not including the weights may make any potential increase in
+precision that comes from *not* using the weights as poor trade-off.
+
+## Questions
+
+1. This exercise uses the WA State crime data for 2004 as the population.
+The data consists of crime rates and population sizes for the police districts
+(in cities/towns) and shefiffs' offices (in unincorporated areas), grouped by
+county.
+
+* Take a simple random sample of ten countiesfrom the state and use all the 
+data from the sampled counties. Estimate the total number of murders and 
+burglaries in the state.
+
+* Use the population of each county as an auxiliary variable to estimate the
+totals.
+
+* Use the numbers of murders and burglaries in the previous year as auxiliary 
+variables in a regression estimate of the totals (why can't we use a ratio
+estimate here?)
+
+* Stratify the sampling so that King County is sampled with 100% probability 
+ together with a simple random sample of five other counties. use population
+ as an auxiliary variable to construct a commmon ratio estimate and a separate
+ ratio estimate of the population totals.
+ 
+* Take simple random samples of five police districts from King County and 
+five counties from the rest of the state. use population as an auxiliary
+variable to construct a commmon ratio estimate and a separate ratio estimate of 
+the population totals.
+
+2. Using the WA state crime data as a population, take a stratified sample
+of five police districts from King County and five counties from the rest of the
+state. Estimate the ratio of violent crimes to non-violent crimes. Compare to
+the population value.
+
+3. Using the data from Wave 1 of the 1996 SIPP panel (see Figure 3.8)
+
+* Estimate the ratio of population totals for monthly rent (`tmthrnt`) and
+total household income (`thtrninc`) over the whole population and over the
+subpopulation who pay rent.
+
+* Compute the individual-level ratio, i.e., the proportion of household income
+paid in rent, and estimate the population mean over the whole population and 
+over the subpopulation who pay rent.
+
+
+4. Use the stratified sample from the Academic Performance Index population
+to examine whether the proportion of teachers with only emergency qualifications
+(`emer`) affects academic performance (as measured by 2000 API).
+
+* What confouding variables measuring socioeconomic status of students should be 
+included in the model?
+
+* Should 1999 API be in hthe model (and why, or why not?)
+
+* Do any of the confounding variables need to be transformed?
+
+* Does `emer` need to be transformed?
+
+* What is the conclusion at the end?
+
+5. Following on from the previous exercise, fit the same model to the whole
+population (the data set `apipop`) using the `glm()` function.
+
+* Do the sample estimates agree with the population data? Do your decisions
+about transforming variables hold up in the population data?
+
+* Fit the same model to 100 stratified samples from the population. Is the 
+sampling distribution of the coefficients close to a Normal distribution?
+
+6. Using the blood pressure data from NHANES 2003 - 2006, investigate the 
+effect of obesity on blood pressure using the BOdy Mass Index and blood pressure
+data.
+
+* What variables in the data set are potential confounders?
+* Are there important confounders that are not measured?
+* Fit one or more suitable regression models and summarize the output.
+* Examine whether there is an interaction with age or sex.
+
+7. Prove that an unweighted regression estimator is approximately unbiased when
+the weights depend only on variables in the model. Specifically, if the true
+population regression coefficients $\beta^*$ satisfy:
+
+$$
+\sum_{i=1}^{N} x_i(y_i - x_i\beta^*) = 0
+$$
+
+and $R_i$ indicates that observation $i$ is in the sample prove that
+
+$$
+E \left [ \sum_{i=1}^{N} R_ix_i (y_i - x_i \beta^*)\right ] = 0
+$$
+
+so that the unweighted sample estimating equations are unbiased.
+
+5.8 A rough approximation to the loss of efficiency from unnecessarily using
+weights can be constructed by considering the variance of the residuals in 
+weighted and unweighted estimation. Assume as an approximation that the 
+residuals $r_i$ are independent of the sampling weights $w_i$
+
+* Show that 
+$$ 
+V[\sum_{i=1}^{n} w_ir_i] = E[w^2] V[r] + V[w]E[r^2]
+$$
+
+* Now assume that the mean of the residuals is zero, and show that the 
+relative efficiency of the unweighted estimate is $1 + cv(w)$ where $cv$ is the
+coefficient of variation, the ratio of the standard deviation to the mean.
 
 # Chapter 6: Categorical Data Regression
+
+
 
 # Chapter 7: Post-Stratification, Raking, and Calibration
 
