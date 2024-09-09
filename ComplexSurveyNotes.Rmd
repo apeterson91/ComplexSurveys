@@ -1879,7 +1879,7 @@ Estimation would be much more complicated if the samples overlapped in some way.
 
 a.  Construct a survey design object with these data.
 
-```{r}
+```{r 31_a}
 ## data are from the book website:
 # https://r-survey.r-forge.r-project.org/svybook/
 # demographic data
@@ -1887,15 +1887,27 @@ ddf <- haven::read_xpt("data/nhanesxpt/demo_c.xpt")
 # blood pressure data
 bpdf <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
 
-bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE)
+bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE) %>%
+  mutate(
+    sys_over_140 = (BPXSY1 > 140) * 1,
+    dia_over_90 = (BPXDI1 > 90) * 1,
+    hbp = (sys_over_140 + dia_over_90 == 2) * 1,
+    age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
+    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male", "Female"))
+  )
 
 bpdf_design <- bpdf %>%
+  select(
+    sys_over_140, dia_over_90, hbp, WTMEC2YR, SDMVPSU, SDMVSTRA,
+    age_group, sex
+  ) %>%
   as_survey_design(
     weights = WTMEC2YR,
     id = SDMVPSU,
     strata = SDMVSTRA,
     nest = TRUE
   )
+bpdf_design
 ```
 
 b.  Estimate the proportion of the US population with systolic blood pressure
@@ -1904,13 +1916,8 @@ b.  Estimate the proportion of the US population with systolic blood pressure
 Lumley doesn't tell us which variable name corresponds to the measurements 
 indicated and I didn't see any documentation in the files included so I just
 guess here.
-```{r}
+```{r 31_b}
 bpdf_design %>%
-  mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1,
-    dia_over_90 = (BPXDI1 > 90) * 1,
-    hbp = (sys_over_140 + dia_over_90 == 2) * 1
-  ) %>%
   summarize(
     prop_hbp_one =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
@@ -1927,15 +1934,8 @@ Included in the output above.
 
 d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
 
-```{r}
+```{r 31_d}
 nhanes_ests <- bpdf_design %>%
-  mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1,
-    dia_over_90 = (BPXDI1 > 90) * 1,
-    hbp = (sys_over_140 + dia_over_90 == 2) * 1,
-    age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
-    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male", "Female"))
-  ) %>%
   group_by(sex, age_group) %>%
   summarize(
     prop_hbp_one =
@@ -1951,7 +1951,7 @@ nhanes_ests
 This produces a bunch of output, so I plot the high blood pressure result ---
 both high systolic and diastolic blood pressure -- below.
 
-```{r}
+```{r 31_compiled}
 nhanes_ests %>%
   select(age_group, sex, prob_hbp, prob_hbp_low, prob_hbp_upp) %>%
   filter(!is.na(age_group)) %>%
@@ -1971,24 +1971,24 @@ nhanes_ests %>%
 
 FYI the `sampling::UPtille` function takes a while so running this simulation
 1000 times takes a while.
-```{r simulated_pps, cache = TRUE}
-one.sim <- function() {
+```{r 32_simulated_pps}
+OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
   ppsample$wt <- 1 / ppsample$p
-  pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample)
+  pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample, pps = "brewer")
   total <- svytotal(~ Bush + Kerry + Nader, pps_design)
   std_err <- sqrt(diag(attr(total, "var")))
   ci <- confint(total)
   out <- cbind(total, std_err, ci)
 }
-total_sims <- replicate(10, one.sim())
+total_sims <- replicate(10, OneSimulation())
 ```
 
 a) Check that the mean of the estimated totals is close to the true population 
 totals.
 
-```{r pps_totals, eval = FALSE}
+```{r pps_totals}
 estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2014,7 +2014,8 @@ estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
 true_stderr <- as_tibble(apply(total_sims, 1, sd)) %>%
-  mutate(label = "Truth")
+  mutate(label = "Truth", Candidate = c("Bush","Kerry", "Nader")) %>% 
+  spread(Candidate,value)
 
 rbind(estimated_stderrs, true_stderr) %>%
   gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>%
@@ -2024,13 +2025,15 @@ rbind(estimated_stderrs, true_stderr) %>%
   gt::tab_header("Simulated Standard Error Comparison")
 ```
 
+Same as above.
+
 c) Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
-```{r pps_cis}
+```{r pps_cis, eval = FALSE}
 totals <- unlist(true_totals[, 1:3])
-prop_contained <- rowMeans((total_sims[, 3, ] < totals & 
-                              total_sims[, 4, ] > totals) * 1)
+prop_contained <- rowMeans((total_sims[, 3, ] < totals &
+  total_sims[, 4, ] > totals) * 1)
 prop_contained
 ```
 
@@ -2136,23 +2139,47 @@ population. The data consists of crime rates and population size for the
 police districts (in cities/towns) and sheriffs' offices 
 (in unincorporated areas), grouped by county.
 
+I took the data from this 
+[website](https://www.waspc.org/cjis-statistics---reports). Specifically,
+[this excel sheet](https://waspc.memberclicks.net/index.php?option=com_content&view=article&id=121:crime-in-wa-archive-folder&catid=20:site-content). One of the tricky things about using this data was the fact 
+that several police districts are reported as having zero associated population.
+I removed these from the dataset to make things simpler.
+
+
 a) Take a simple random sample of 10 counties from the state and use all the
 data from the sampled counties. Estimate the total number of murders and
 burglaries in the state.
 
 ```{r wacrime_36a}
-wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>% 
-  filter(Year == "2004") %>% 
+# data from
+wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
+  filter(Year == "2004", Population > 0) %>%
   mutate(
     murder_and_crime = `Murder Total` + `Burglary Total`,
-    state_pop = sum(Population)
-         ) 
+    state_pop = sum(Population),
+    County = stringr::str_to_lower(County),
+    num_counties = n_distinct(County),
+  ) %>%
+  group_by(County) %>%
+  mutate(num_agencies = n_distinct(Agency)) %>%
+  ungroup() %>%
+  select(
+    County, Agency, Population, murder_and_crime,
+    num_counties, num_agencies
+  )
+
+true_count <- sum(wa_crime_df$murder_and_crime)
 county_list <- unique(wa_crime_df$County)
 county_sample <- sample(county_list, 10)
-wa_crime_df %>% 
-  filter(County %in% county_sample) %>% 
-  as_survey_design() %>% 
-  summarize(total = survey_total(murder_and_crime, vartype = "ci"))
+part_a <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  ) %>%
+  summarize(total = survey_total(murder_and_crime)) %>%
+  mutate(Q = "a")
+part_a
 ```
 
 
@@ -2162,41 +2189,313 @@ total number of of murders and burglaries in the state and compare to the
 previous estimates.
 
 ```{r wacrime_36b}
-county_list[-which(county_list == "King" | county_list == "KING")]
+county_sample <- sample(county_list[-which(county_list == "king")], 5)
+county_sample <- c(county_sample, "king")
+part_b <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  mutate(
+    strata_label = if_else(County == "king", "strata 1", "strata 2"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1)
+  ) %>%
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  ) %>%
+  summarize(
+    total = survey_total(murder_and_crime)
+  ) %>%
+  mutate(Q = "b")
+part_b
 ```
 
 c) Take simple random samples of five police districts from King County and
 five counties from the rest of the state. Estimate the total number of murders
 and burglaries in the state and compare to the previous estimates.
 
-```{r wacrime_36b}
+This is a stratified two-stage sample design with no uncertainty in the 
+first stage in one (king county) strata, and no uncertainty in the second stage 
+in the other (non-king counties) strata.
 
+```{r wacrime_36c}
+king_districts <- wa_crime_df %>%
+  filter(County == "king") %>%
+  pull(Agency)
+sampled_king_districts <- sample(king_districts, 5)
+sampled_counties <- sample(county_list, 5)
+
+part_c <- wa_crime_df %>%
+  filter(County %in% sampled_counties | Agency %in% sampled_king_districts) %>%
+  mutate(
+    strata_label = if_else(County == "king", "King County", "WA Counties"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1),
+  ) %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  ) %>%
+  summarize(total = survey_total(murder_and_crime, vartype = "se")) %>%
+  mutate(Q = "c")
+part_c
 ```
+
 
 d) Take a probability proportional to size (PPS) sample of 10 police districts.
 Estimate the total number of murders and burglaries in the state and compare
 to the previous estimates.
 
-3) Take a simple random sample of counties and include all the police districts.
+```{r wacrime_36d}
+pi <- sampling::inclusionprobabilities(a = wa_crime_df$Population, n = 10)
+part_d <- wa_crime_df %>%
+  mutate(
+    pi = pi,
+    in_sample = sampling::UPbrewer(pi)
+  ) %>%
+  filter(in_sample == 1) %>%
+  as_survey_design(probs = pi) %>%
+  summarize(total = survey_total(murder_and_crime)) %>%
+  mutate(Q = "d")
+part_d
+```
+
+This has the lowest standard error yet, likely since the sampling was
+specifically designed to capture high density districts.
+
+e) Take a simple random sample of counties and include all the police districts.
 Estimate the total number of murders and burglaries in the state and
 compare to the previous estimates.
+
+```{r wacrime36e}
+county_sample <- sample(county_list, 10)
+part_e <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  ) %>%
+  summarize(total = survey_total(murder_and_crime)) %>%
+  mutate(Q = "e")
+part_e
+```
+
+
+I'll compare the standard error of all the estimates now.
+
+```{r compare_36_answers}
+rbind(part_a, part_b, part_c, part_d, part_e) %>%
+  select(Q, total_se) %>%
+  gt::gt()
+```
+
+We see the highest variance in estimates from the simple random samples - 
+Q's a) and e). We see the lowest variance from part d) which used the 
+proportional to size sampling scheme. Finally, we see the two 
+stratified multi-stage samples have variances in between, all of which makes 
+sense.
 
 3.7 Use the household data from the 1966 SIP panel to estimate the 25th, 50th,
 75th, 90th and 95th percentiles of income for households of different sizes
 (`ehhnumpp`) averaged over the fourth months. You will want to recode the large
 values of `ehhnumpp` to a a single category. Describe the patterns you see.
 
+For this question we effectively copy the code from the "Repeated Measures"
+section, looking at quantile by a recoded household size now, instead of
+month.
+
+```{r 37}
+sipp_hh <- update(sipp_hh,
+  household_size = factor(
+    case_when(
+      ehhnumpp <= 8 ~ as.character(ehhnumpp),
+      TRUE ~ ">=9"
+    ),
+    levels = c(as.character(1:8), ">=9")
+  )
+)
+qinc <- svyby(~thtotinc, ~household_size, svyquantile,
+  design = sipp_hh,
+  quantiles = c(0.25, 0.5, 0.75, 0.9, 0.95), se = TRUE
+)
+```
+
+```{r}
+pltdf <- as_tibble(qinc) %>%
+  select(household_size, contains("thtotinc"), -contains("se.")) %>%
+  gather(everything(), -household_size, key = "quantile", value = "Total Income") %>%
+  mutate(quantile = as.numeric(str_extract(quantile, "[0-9].[0-9]?[0-9]")) * 100)
+
+se <- as_tibble(qinc) %>%
+  select(household_size, contains("se.")) %>%
+  gather(everything(), -household_size, key = "quantile", value = "SE") %>%
+  mutate(quantile = as.numeric(str_extract(quantile, "[0-9].[0-9]?[0-9]")) * 100)
+
+pltdf <- pltdf %>%
+  left_join(se) %>%
+  mutate(
+    lower = `Total Income` - 2 * SE,
+    upper = `Total Income` + 2 * SE
+  )
+
+pltdf %>%
+  mutate(quantile = factor(quantile)) %>%
+  ggplot(aes(x = household_size, y = `Total Income`, color = quantile)) +
+  geom_pointrange(aes(ymin = lower, ymax = upper)) +
+  xlab("Household Size") +
+  ylab("Total Income (USD)") +
+  ggtitle("Total Income Quantiles",
+    subtitle = "Survey of Income and Program Participation"
+  )
+```
+
+In the plot above we can see that the income variability gets wider as 
+household size increases but then plateaus at around ~ 5. Additionally, there
+are few samples with very large households so estimating the quantiles for those
+groups is increasingly noisy.
+
 3.8 In the data from the 1996 SIPP panel
 a) What proportion of households received any "means-tested cash benefits"
-(`thtrninc`)? For those households that did not receive benefits what mean
+(`thtrninc`)? For those households that did receive benefits what mean
 proportion of their total income came from these benefits?
+
+
+```{r 38a}
+db <- DBI::dbConnect(RSQLite::SQLite(), "Data/SIPP/sipp.db")
+sipp_df <- tbl(db, sql("SELECT * FROM household")) %>%
+  dplyr::collect() %>%
+  select(ghlfsam, gvarstr, whfnwgt, thtotinc, thtrninc, tmthrnt) %>%
+  mutate(
+    benefit_recipient = I(thtrninc > 0) * 1,
+    thtrninc = as.numeric(thtrninc),
+    tmthrnt = as.numeric(tmthrnt)
+  )
+
+sipp_hh_sub <- sipp_df %>%
+  as_survey_design(
+    id = ghlfsam, strata = gvarstr, nest = TRUE,
+    weight = whfnwgt
+  )
+sipp_hh_sub %>%
+  summarize(prop_benefit_recipients = survey_mean(benefit_recipient))
+```
+
+```{r 38a_2}
+sipp_hh_sub %>%
+  filter(benefit_recipient == 1) %>%
+  mutate(prop_benefit_income = thtrninc / thtotinc) %>%
+  summarize(
+    mn_prop_benefit_income = survey_mean(prop_benefit_income)
+  )
+```
+
+
 b) What proportion of households paid rent `tmthrnt`? What were the mean and the
 75th and 95th percentiles of the proportion of monthly income paid in rent?
 What proportion paid more than one third of their income in rent?
 
+```{r 38b}
+sipp_hh_sub %>%
+  mutate(
+    pays_rent = I(as.numeric(tmthrnt) > 0) * 1,
+    pct_income_rent = (tmthrnt / thtotinc) * 100,
+    rent_pct_gt_thrd = (pct_income_rent > 0.33) * 1
+  ) %>%
+  # avoid divide by zero error
+  filter(thtotinc >0) %>% 
+  summarize(
+    prop_pays_rent = survey_mean(pays_rent),
+    mean_pct_income_rent = survey_mean(pct_income_rent, na.rm = TRUE),
+    quantile_pct_income_rent = survey_quantile(pct_income_rent, 
+                                                   na.rm = TRUE, 
+                                                   quantiles = c(.75,.95)),
+    prop_rent_gt_thrd = survey_mean(rent_pct_gt_thrd, na.rm = TRUE)
+  ) %>% 
+  pivot_longer(cols = everything(), names_to = "Rent", values_to = "Estimates")
+```
+
+
 3.9 By the time you read this, the `survey` package is likely to provide some
 approximations for PPS designs that use the finite population size information.
 Repeat 3.2 using these.
+
+```{r 32_simulated_pps}
+OneSimulation <- function() {
+  insample <- sampling::UPtille(election$p)
+  ppsample <- election[insample == 1, ]
+  ppsample$wt <- 1 / ppsample$p
+  pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample, pps = "brewer")
+  total <- svytotal(~ Bush + Kerry + Nader, pps_design)
+  std_err <- sqrt(diag(attr(total, "var")))
+  ci <- confint(total)
+  out <- cbind(total, std_err, ci)
+}
+total_sims <- replicate(10, OneSimulation())
+```
+
+a) Check that the mean of the estimated totals is close to the true population 
+totals.
+
+```{r 39_fpcpps}
+OneSimulation <- function() {
+  insample <- sampling::UPtille(election$p)
+  ppsample <- election[insample == 1, ]
+  ppsample$wt <- 1 / ppsample$p
+  ppsample$fpc <- 40 / sum(election$votes)
+  pps_design <- svydesign(id = ~1, weight = ~wt, fpc = ~fpc, data = ppsample, pps = "brewer")
+  total <- svytotal(~ Bush + Kerry + Nader, pps_design)
+  std_err <- sqrt(diag(attr(total, "var")))
+  ci <- confint(total)
+  out <- cbind(total, std_err, ci)
+}
+total_sims <- replicate(10, OneSimulation())
+```
+
+```{r 39_fpc_pps_totals}
+estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
+  mutate(label = "Estimate")
+
+true_totals <- as_tibble(t(colSums(election[, c("Bush", "Kerry", "Nader")]))) %>%
+  mutate(label = "Truth")
+
+rbind(estimated_totals, true_totals) %>%
+  gather(everything(), -label, key = "Candidate", value = "Vote Count") %>%
+  spread(label, `Vote Count`) %>%
+  gt::gt() %>%
+  gt::fmt_scientific() %>%
+  gt::tab_header("Simulated Total Comparison")
+```
+
+These are quite close.
+
+b). Compute the mean of the estimated standard errors and compare it to the
+true simulation standard error, that is, the standard deviation of the 
+estimated totals.
+
+```{r pps_stderrs, eval = FALSE}
+estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
+  mutate(label = "Estimate")
+
+true_stderr <- as_tibble(apply(total_sims, 1, sd)) %>%
+  mutate(label = "Truth", Candidate = c("Bush","Kerry", "Nader")) %>% 
+  spread(Candidate,value)
+
+rbind(estimated_stderrs, true_stderr) %>%
+  gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>%
+  spread(label, `Vote Std.Err`) %>%
+  gt::gt() %>%
+  gt::fmt_scientific() %>%
+  gt::tab_header("Simulated Standard Error Comparison")
+```
+
+Estimate 95% confidence intervals for the population totals and compute the 
+proportion of intervals that contain the true population value.
+
+```{r pps_cis, eval = FALSE}
+totals <- unlist(true_totals[, 1:3])
+prop_contained <- rowMeans((total_sims[, 3, ] < totals &
+  total_sims[, 4, ] > totals) * 1)
+prop_contained
+```
 
 3.10 Repeat 3.2 computing the Hartley-Rao approximation and the full 
 Horvitz-Thompson estimate using the code and joint-probability data on the web
@@ -2204,17 +2503,30 @@ site. Compare the standard errors from these two approximations to the standard
 errors from the single-stage with replacement approxmiation and to the true
 simulation standard error.
 
-3.11 Since 1999, NHANES has been conducting suveys continuously with data 
+```{r 310}
+
+```
+
+3.11 Since 1999, NHANES has been conducting surveys continuously with data 
 released on a 2 year cycle. Each data set includes a weight variable for
 analyzing the two-year data; the weights add to the size of the US adult, 
 civilian, non-institutionalized population.
 
 a) What weight would be appropriate for estimating the number of diabetics in
 the population combining data from two two-year data sets?
+
+* Assuming these are non-overlapping samples --- which seems reasonable
+--- and considering the target population we're generalizing to to be 
+roughly constant over the 4 years of interest, we could divide each of the 
+previous weights in half. This would give us twice the sample size to estimate
+the same target estimand.
+
 b) What weight would be appropriate if three two-year data sets were used?
+
 c) What weights would be appropriate when estimating changes, comparing
 the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
 2005-2006 data?
+
 d) How would the answers differ if the goal was to estimate a population 
 proportion rather than a total?
 
