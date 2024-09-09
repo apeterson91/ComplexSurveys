@@ -2611,7 +2611,7 @@ insurance_coverage <- states %>%
   st_as_sf()
 
 insurance_coverage %>% 
-  ggplot(aes(fill = health_coverage)) + 
+  ggplot(aes(fill = health_coverage)) +
   geom_sf() +
   facet_wrap(~Age) +
   theme_void()
@@ -2628,23 +2628,23 @@ equivalent data.
 
 ```{r city_data}
 cities <- read_sf("Data/BRFSS2007/BRFSS_MMSA_2007.shp") %>% 
-  filter(NAME != "Columbus") %>% 
+  filter(NAME != "Columbus") %>%
   transmute(Insurance = cut(rbeta(n(),1,1),c(0,0.25,.5,.75,1)))
 
-marginal_insurance <- brfss %>% 
+marginal_insurance <- brfss %>%
   as_survey_design() %>%
   mutate(
     covered = (HLTHPLAN == 1) * 1,
     state = X_STATE,
-    ) %>% 
-  group_by(state) %>% 
+    ) %>%
+  group_by(state) %>%
   summarize(
     health_coverage = survey_mean(covered)
   ) %>% ungroup()
 
-map_data <- states %>% 
-  select(ST_FIPS, geometry) %>% 
-  left_join(marginal_insurance, by = c("ST_FIPS" = "state")) %>% 
+map_data <- states %>%
+  select(ST_FIPS, geometry) %>%
+  left_join(marginal_insurance, by = c("ST_FIPS" = "state")) %>%
   st_as_sf()
 
 ggplot() +
