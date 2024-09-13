@@ -3773,24 +3773,68 @@ We can see that the estimate is quite close to the population value
 total household income (`thtrninc`) over the whole population and over the
 subpopulation who pay rent.
 
-```{r 53a}
+I think Lumley may have an error here when he says that `thtrninc` is the 
+total household monthly income - earlier we used `thtotinc` for this measure 
+as he had increating Figure 3.9. Consequently, I use `thtotinc` below.
 
+```{r 53a_1}
+sipp_hh_sub %>% 
+  # Total population
+  summarize(
+    ratio_of_monthly_rent_to_household_income = survey_ratio(tmthrnt, thtotinc)
+  )
 ```
 
+```{r 53a_2}
+sipp_hh_sub %>% 
+  filter(tmthrnt > 0) %>% 
+  # Rent paying subpopulation
+  summarize(
+    ratio_of_monthly_rent_to_household_income = survey_ratio(tmthrnt, thtotinc)
+  )
+```
 * Compute the individual-level ratio, i.e., the proportion of household income
 paid in rent, and estimate the population mean over the whole population and 
 over the subpopulation who pay rent.
 
-```{r 53b}
-
+```{r 53b_1}
+# Full Population
+sipp_hh_sub %>% 
+  mutate(
+    # I also ran the numbers if we excluded those with 0 household rent
+    # and the estimates are effectively the same.
+    prop_income_rent = if_else(thtotinc == 0, 0, (tmthrnt / thtotinc)),
+  ) %>% 
+  summarize(
+    prop_income_rent_est = survey_mean(prop_income_rent)
+  )
 ```
+
+```{r 53b_2}
+sipp_hh_sub %>% 
+  # Rent paying subpopulation
+  filter(tmthrnt > 0) %>% 
+  mutate(
+    # I also ran the numbers if we excluded those with 0 household rent
+    # and the estimates are effectively the same.
+    prop_income_rent = if_else(thtotinc == 0, 0, (tmthrnt / thtotinc)) ,
+  ) %>% 
+  summarize(
+    prop_income_rent_est = survey_mean(prop_income_rent)
+  )
+```
+
+What are we to make of these estimates being different? Well that's because
+they're estimating two different things. As Lumley points out at the start of
+the chapter, one is a ratio of two population-level quantities, the other is 
+the population estimate of a ratio measured at the individual level.
 
 4. Use the stratified sample from the Academic Performance Index population
 to examine whether the proportion of teachers with only emergency qualifications
 (`emer`) affects academic performance (as measured by 2000 API).
 
 
-* What confouding variables measuring socioeconomic status of students should be 
+* What confounding variables measuring socioeconomic status of students should be 
 included in the model?
 
 Going off the web 
@@ -3822,38 +3866,124 @@ Here is a list with a brief explanation:
   * `full` percent fully qualified teachers. A fully qualified teacher will
   presumably be more capable of teaching than one that's not fully qualified.
   
-  * `enroll` Enrollment may also be associated with the API
+  * `enroll` Enrollment may also be associated with the API, if larger schools
+  have access to greater resources, or inversely, worse teacher to student
+  ratios.
 
 * Should 1999 API be in the model (and why, or why not?)
 
-  *  
+  *  The value of including the 1999 API score would be that its very likely one
+  of the most correlated variables with the 2000 score. The downside is that it
+  is also likely correlated with all the other measures, including the `emer`
+  measure, and may mask that variable's weaker impact. I'll leave it out in
+  my estimate to try to avoid this problem.
 
 * Do any of the confounding variables need to be transformed?
 
+  * Several of the binary / categorical variables will need to be transformed 
+  into 0 / 1 or cell means encoding. It could also be beneficial to
+  center several of the continuous variables at the mean to offer an easier
+  interpretation of the model.
+
 * Does `emer` need to be transformed?
+
+It doesn't look like it needs to be to me. I include two plots below that
+visualize the `emer` distribution (in the target population) as well as its 
+relationship with the `api00` measure. While there is a right skew in the
+distribution, this doesn't strike me as problematic and I think a log 
+transformation - an attempt to fix the skew - would not be helpful both because
+of the difficulty in handling 0 values as well as the log-scale interpretation.
+
+It could be worth centering the `emer` value by the estimated population mean 
+to make the interpretation of the intercept more valueable but I don't think
+that's necessary for an adequate model interpretation here.
+
+```{r 54_emer_eda1}
+svyhist(~emer, strat_design)
+```
+
+```{r 54_emer_eda}
+svyplot(api00 ~ emer, strat_design, 
+        main = "CA 2000 API Scores vs. Teacher Emergency Training Preparedness",
+        xlab = "Teachers with emergency training",
+        ylab = "API 2000")
+```
 
 * What is the conclusion at the end?
 
 ```{r 54}
-summary(svyglm(api00 ~ emer, design = strat_design))
+fit <- svyglm(api00 ~ emer + meals + hsg + avg.ed + comp.imp +
+                acs.k3 + acs.46 + ell + full + enroll,
+              design = strat_design)
+summary(fit)
 ```
+
+From the output above, we see that the `emer` value isn't found to be 
+significantly associated (at $\alpha = 0.05$) with the 2000 API measure after
+adjusting for other variables. Indeed, `meals`, `avg.ed` and `acs.46` are the
+only values for which there is evidence to support a relationship at this
+level. 
 
 5. Following on from the previous exercise, fit the same model to the whole
 population (the data set `apipop`) using the `glm()` function.
 
+```{r 55}
+fit_pop <- glm(api00 ~  emer + meals + hsg + avg.ed + comp.imp +
+                acs.k3 + acs.46 + ell + full + enroll, data = apipop)
+summary(fit_pop)
+```
+
 * Do the sample estimates agree with the population data? Do your decisions
 about transforming variables hold up in the population data?
+
+*Some* of the sample estimates agree with the population data. It is very clear
+that there is a whole lot more power to detect associations when the entire 
+population is present. In brief, we see that the three variables for which
+an association was detected previously --- `meals`, `acs.46` and `avg.edu` ---
+all have similar (within the sample based estimate margin of error) estimates
+on the full population data. Additionally, many other variables now 
+have significant associations that did not previously. Notably the `emer` 
+variable has a positive association with the `api00` such that we'd expect to
+see a .5 gain in API score for every additional percent gain in teachers that
+are emergency qualified.
 
 * Fit the same model to 100 stratified samples from the population. Is the 
 sampling distribution of the coefficients close to a Normal distribution?
 
+
+```{r 55_c}
+OneSimulation <- function() {
+  coefs <- apipop %>% 
+    group_by(stype) %>% 
+    slice_sample(n = 66) %>% 
+    ungroup() %>% 
+    as_survey_design(
+      strata = stype
+    ) %>% 
+    svyglm(api00 ~  emer + meals + hsg + avg.ed + comp.imp +
+                acs.k3 + acs.46 + ell + full + enroll, design = .) %>% 
+    coef(.)
+  return(coefs)
+}
+coef_dist <- replicate(100, OneSimulation())
+par(mfrow = c(1,2))
+hist(coef_dist[1,], main = "Histogram of Intercept")
+hist(coef_dist[2,], main = "Histogram of emer")
+```
+
+Yes, as we'd expect the sampling distributions are roughly normal.
+
+
 6. Using the blood pressure data from NHANES 2003 - 2006, investigate the 
-effect of obesity on blood pressure using the BOdy Mass Index and blood pressure
+effect of obesity on blood pressure using the Body Mass Index and blood pressure
 data.
 
 * What variables in the data set are potential confounders?
+
 * Are there important confounders that are not measured?
+
 * Fit one or more suitable regression models and summarize the output.
+
 * Examine whether there is an interaction with age or sex.
 
 7. Prove that an unweighted regression estimator is approximately unbiased when
