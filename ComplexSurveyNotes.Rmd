@@ -1892,8 +1892,8 @@ bpdf <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
 
 bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE) %>%
   mutate(
-    sys_over_140 = (BPXSY1 > 140) * 1,
-    dia_over_90 = (BPXDI1 > 90) * 1,
+    sys_over_140 = (BPXSAR > 140) * 1,
+    dia_over_90 = (BPXDAR > 90) * 1,
     hbp = (sys_over_140 + dia_over_90 == 2) * 1,
     age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
     sex = factor(RIAGENDR, levels = 1:2, labels = c("Male", "Female"))
@@ -1902,7 +1902,7 @@ bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE) %>%
 bpdf_design <- bpdf %>%
   select(
     sys_over_140, dia_over_90, hbp, WTMEC2YR, SDMVPSU, SDMVSTRA,
-    age_group, sex
+    age_group, sex, RIDAGEYR, BPXSAR, BPXDAR, RIAGENDR, RIDAGEMN
   ) %>%
   as_survey_design(
     weights = WTMEC2YR,
@@ -1921,11 +1921,6 @@ indicated and I didn't see any documentation in the files included so I just
 guess here.
 ```{r 31_b}
 bpdf_design %>%
-  mutate(
-    sys_over_140 = (BPXSAR > 140) * 1,
-    dia_over_90 = (BPXDI1 > 90) * 1,
-    hbp = (sys_over_140 + dia_over_90 == 2) * 1
-  ) %>%
   summarize(
     prop_hbp_one =
       survey_ratio(sys_over_140, n(), na.rm = TRUE, vartype = "ci", deff = TRUE),
@@ -1944,13 +1939,6 @@ d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
 
 ```{r 31_d}
 nhanes_ests <- bpdf_design %>%
-  mutate(
-    sys_over_140 = (BPXSAR > 140) * 1,
-    dia_over_90 = (BPXDI1 > 90) * 1,
-    hbp = (sys_over_140 + dia_over_90 == 2) * 1,
-    age_group = cut(RIDAGEYR, c(0, 21, 65, Inf)),
-    sex = factor(RIAGENDR, levels = 1:2, labels = c("Male", "Female"))
-  ) %>%
   group_by(sex, age_group) %>%
   summarize(
     prop_hbp_one =
@@ -2171,6 +2159,8 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   filter(Year == "2004", Population > 0) %>%
   mutate(
     murder_and_crime = `Murder Total` + `Burglary Total`,
+    violent_crime = `Violent Crime Total`,
+    property_crime = `Property Crime Total`,
     state_pop = sum(Population),
     County = stringr::str_to_lower(County),
     num_counties = n_distinct(County),
@@ -2179,7 +2169,8 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   mutate(num_agencies = n_distinct(Agency)) %>%
   ungroup() %>%
   select(
-    County, Agency, Population, murder_and_crime,
+    County, Agency, Population, murder_and_crime, 
+    violent_crime, property_crime,
     num_counties, num_agencies
   )
 
@@ -2432,7 +2423,7 @@ sipp_hh_sub %>%
 approximations for PPS designs that use the finite population size information.
 Repeat 3.2 using these.
 
-```{r 32_simulated_pps}
+```{r 39_simulated_pps}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2485,7 +2476,7 @@ b). Compute the mean of the estimated standard errors and compare it to the
 true simulation standard error, that is, the standard deviation of the 
 estimated totals.
 
-```{r pps_stderrs, eval = FALSE}
+```{r 39_pps_stderrs, eval = FALSE}
 estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2504,7 +2495,7 @@ rbind(estimated_stderrs, true_stderr) %>%
 Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
-```{r pps_cis, eval = FALSE}
+```{r 39_pps_cis, eval = FALSE}
 totals <- unlist(true_totals[, 1:3])
 prop_contained <- rowMeans((total_sims[, 3, ] < totals &
   total_sims[, 4, ] > totals) * 1)
@@ -2937,8 +2928,8 @@ insurance_coverage %>%
   ggplot(aes(fill = health_coverage)) +
   geom_sf() +
   facet_wrap(~Age) +
-  theme_void()
-  theme(legend.title = element_blank()) +
+  theme_void() +
+  theme(legend.title = element_blank()) 
 ```
 
 Lumley then shows two plots with insurance coverage at the state level. 
@@ -3081,7 +3072,7 @@ which came out of GEE are used by the `survey` package, with special
 handling for combining variance within/across strata.
 
 
-## 5.1 Ratio Estimation
+## Ratio Estimation
 
 Ratio estimation comes up first in this chapter because it is important in
 estimating (1) a population mean/total, (2) a ratio directly or (3) a
@@ -3545,9 +3536,9 @@ distorted associations between exposure and response, it is plausible that a
 regression model might not need sampling weights.
 
 A key assumption here is whether the population we're estimating is stable 
-across the population(s) represented by our dataset. The naive, biased 
+across the population(s) represented by our data set. The naive, biased 
 population that our sample represents when unweighted, or the "target" 
-population our sample represents when reweighted. A follow-up question would
+population our sample represents when re-weighted. A follow-up question would
 ask whether we could even estimate the relationship as desired, if the 
 effect is heterogeneous across populations. Lumley cites [@dumouchel1983using]
 for further discussion on this topic.
@@ -3573,31 +3564,208 @@ The data consists of crime rates and population sizes for the police districts
 (in cities/towns) and shefiffs' offices (in unincorporated areas), grouped by
 county.
 
-* Take a simple random sample of ten countiesfrom the state and use all the 
+* Take a simple random sample of ten counties from the state and use all the 
 data from the sampled counties. Estimate the total number of murders and 
 burglaries in the state.
 
+```{r wacrime_51a}
+county_sample <- wa_crime_df %>% 
+  distinct(County) %>% 
+  slice_sample(n = 10) %>% 
+  pull(County)
+
+wa_crime_df %>% 
+  filter(County %in% county_sample) %>% 
+  as_survey_design() %>% 
+  summarize(
+    crime = survey_total(murder_and_crime)
+  )
+```
+
 * Use the population of each county as an auxiliary variable to estimate the
 totals.
+
+```{r wacrime_51b}
+ratio_estimate <- wa_crime_df %>% 
+  filter(County %in% county_sample) %>% 
+  as_survey_design() %>% 
+  svyratio(~murder_and_crime, ~Population, design = .)
+
+predict(ratio_estimate, total = sum(wa_crime_df$Population)) 
+```
 
 * Use the numbers of murders and burglaries in the previous year as auxiliary 
 variables in a regression estimate of the totals (why can't we use a ratio
 estimate here?)
 
+```{r, wacrime_51c}
+wa_crime_03_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
+  filter(Year == "2003", Population > 0) %>%
+  mutate(
+    murder_and_crime = `Murder Total` + `Burglary Total`,
+    state_pop = sum(Population),
+    County = stringr::str_to_lower(County),
+    num_counties = n_distinct(County),
+  ) %>%
+  group_by(County) %>%
+  mutate(num_agencies = n_distinct(Agency)) %>%
+  ungroup() %>%
+  select(
+    County, Agency, Population, murder_and_crime,
+    num_counties, num_agencies
+  )
+
+model_df <- wa_crime_03_df %>% 
+  mutate(year = "2003") %>% 
+  bind_rows(wa_crime_df %>% mutate(year = "2004")) %>% 
+  mutate(
+    # We'll use 2004's numbers here for the fpc.
+    num_counties = if_else(year == "2004", num_counties, 0),
+    num_agencies = if_else(year == "2004", num_agencies, 0),
+  ) %>% 
+  spread(year, murder_and_crime) %>% 
+  group_by(County,Agency) %>% 
+  summarize( 
+    num_counties = sum(num_counties),
+    num_agencies = sum(num_agencies),
+    `2003` = sum(replace_na(`2003`,0)),
+    `2004` = sum(replace_na(`2004`,0))
+  ) %>% 
+  ungroup() %>% 
+  filter(
+    # Agencies were removed between 2003 and 2004. 
+    num_counties > 0, num_agencies > 0,
+    County %in% county_sample
+    ) 
+
+model_design <- model_df %>%  
+  as_survey_design(id = c(County, Agency),
+                   fpc = c(num_counties, num_agencies))
+
+fit <- svyglm(`2004` ~ `2003`, design = model_design)
+
+total_matrix <- c(sum(wa_crime_03_df$murder_and_crime))
+total_matrix <- as.data.frame(total_matrix)
+names(total_matrix) <- "2003"
+
+predict(fit, newdata = total_matrix)
+```
+
+We can't use a ratio estimator here because we're not using the total population
+of the year in question as the denominator, we're only looking at the total
+number of murders and burglaries in the previous year and relating it to the
+next, without measuring the total population, explicitly.
+
 * Stratify the sampling so that King County is sampled with 100% probability 
  together with a simple random sample of five other counties. use population
- as an auxiliary variable to construct a commmon ratio estimate and a separate
+ as an auxiliary variable to construct a common ratio estimate and a separate
  ratio estimate of the population totals.
+
+```{r wacrime_51d}
+smaller_county_sample <- wa_crime_df %>% 
+  distinct(County) %>% 
+  filter(County != "king") %>% 
+  slice_sample(n = 5) %>% 
+  pull(County)
+
+county_list <- unique(wa_crime_df$County)
+
+design <- wa_crime_df %>% 
+  filter(County == "king" | County %in% smaller_county_sample) %>% 
+  mutate(
+    strata_label = if_else(County == "king", "King County", "WA Counties"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1)
+  ) %>% 
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  )
+
+strata_totals <- wa_crime_df %>% 
+  mutate(strata = if_else(County == "king","King", "WA Counties")) %>% 
+  group_by(strata) %>% 
+  summarize(Population = sum(Population)) %>% 
+  spread(strata,Population) %>% 
+  as.matrix()
+
+separate_estimator <- svyratio(~murder_and_crime, ~Population, design,
+                               separate = TRUE)
+common_estimator <- svyratio(~murder_and_crime, ~Population, design)
+predict(separate_estimator, total = strata_totals)
+```
+
+
+```{r wacrime51d_}
+predict(common_estimator, total = sum(wa_crime_df$Population))
+```
  
 * Take simple random samples of five police districts from King County and 
 five counties from the rest of the state. use population as an auxiliary
-variable to construct a commmon ratio estimate and a separate ratio estimate of 
+variable to construct a common ratio estimate and a separate ratio estimate of 
 the population totals.
+
+```{r wacrime_51e}
+king_districts <- wa_crime_df %>%
+  filter(County == "king") %>%
+  pull(Agency)
+sampled_king_districts <- sample(king_districts, 5)
+sampled_counties <- sample(county_list, 5)
+
+design <- wa_crime_df %>%
+  filter(County %in% sampled_counties | Agency %in% sampled_king_districts) %>%
+  mutate(
+    strata_label = if_else(County == "king", "King County", "WA Counties"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1),
+  ) %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  )
+
+
+separate_estimator <- svyratio(~murder_and_crime, ~Population, design,
+                               separate = TRUE)
+common_estimator <- svyratio(~murder_and_crime, ~Population, design)
+predict(separate_estimator, total = strata_totals)
+```
+
+
+```{r wacrime_51e_}
+predict(common_estimator, total = sum(wa_crime_df$Population))
+```
 
 2. Using the WA state crime data as a population, take a stratified sample
 of five police districts from King County and five counties from the rest of the
 state. Estimate the ratio of violent crimes to non-violent crimes. Compare to
 the population value.
+
+```{r wacrime_52}
+sampled_king_districts <- sample(king_districts, 5)
+sampled_counties <- sample(county_list, 5)
+
+wa_crime_df %>%
+  filter(County %in% sampled_counties | Agency %in% sampled_king_districts) %>%
+  mutate(
+    strata_label = if_else(County == "king", "King County", "WA Counties"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1),
+  ) %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  ) %>% 
+  summarize(
+    violent_non_violent = survey_ratio(violent_crime, property_crime)
+  )
+```
+
+```{r wacrime_52_check}
+round(sum(wa_crime_df$violent_crime) / sum(wa_crime_df$property_crime),2)
+```
+
+We can see that the estimate is quite close to the population value
 
 3. Using the data from Wave 1 of the 1996 SIPP panel (see Figure 3.8)
 
@@ -3605,25 +3773,70 @@ the population value.
 total household income (`thtrninc`) over the whole population and over the
 subpopulation who pay rent.
 
+```{r 53a}
+
+```
+
 * Compute the individual-level ratio, i.e., the proportion of household income
 paid in rent, and estimate the population mean over the whole population and 
 over the subpopulation who pay rent.
 
+```{r 53b}
+
+```
 
 4. Use the stratified sample from the Academic Performance Index population
 to examine whether the proportion of teachers with only emergency qualifications
 (`emer`) affects academic performance (as measured by 2000 API).
 
+
 * What confouding variables measuring socioeconomic status of students should be 
 included in the model?
 
-* Should 1999 API be in hthe model (and why, or why not?)
+Going off the web 
+[documentation](https://r-survey.r-forge.r-project.org/survey/html/api.html)
+of the `api` dataset from the `survey` package, it looks like there are a 
+number of possible confounding variables should be included in the model. 
+Here is a list with a brief explanation:
+  * `meals`: The % of students eligible for subsidized meals. This is a proxy
+  for poverty and is likely correlated with the academic achievement measured
+  by the test.
+  
+  * `hsg`: percent of parents who are high school graduates. Parental academic
+  achievement is likely associated with their students' academic achievement.
+  
+  * `avg.ed`: Average parental education level - this might be able to combine
+  the above variable along with those who have college or post-graduate 
+  education.
+  
+  * `comp.imp`  refers to a school "growth" improvement targets that may be
+  related to students' academic performance.
+  
+  * `acs.k3` average class size years K-3 - class size is often associated with
+  academic performance There is a similar `acs.46` variable for grades 4-6.
+  
+  *  `ell` The percent of english language learners. Since most classes are 
+  typically instructed in english, a non-native english speakers may struggle
+  more with academic instruction.
+  
+  * `full` percent fully qualified teachers. A fully qualified teacher will
+  presumably be more capable of teaching than one that's not fully qualified.
+  
+  * `enroll` Enrollment may also be associated with the API
+
+* Should 1999 API be in the model (and why, or why not?)
+
+  *  
 
 * Do any of the confounding variables need to be transformed?
 
 * Does `emer` need to be transformed?
 
 * What is the conclusion at the end?
+
+```{r 54}
+summary(svyglm(api00 ~ emer, design = strat_design))
+```
 
 5. Following on from the previous exercise, fit the same model to the whole
 population (the data set `apipop`) using the `glm()` function.
