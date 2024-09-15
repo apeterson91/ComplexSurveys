@@ -2560,7 +2560,7 @@ more, it isn't always clear how he produces the charts in the chapter.
 Consequently I've done my best to reproduce the same charts, or a chart I'd
 consider appropriate for the question / survey at hand in the following charts.
 
-TODO: Talk about gsurvey.
+TODO: Talk about ggsurvey.
 
 ## Plotting a Table
 
@@ -3980,11 +3980,46 @@ data.
 
 * What variables in the data set are potential confounders?
 
+Given the discussion in the book's example, sodium and potassium intake are 
+likely confounders alongside the usual, age, sex race and socioeconomic status.
+That said, i don't know if the last of these two are available given that the
+variable names in the dataset are not particularly descriptive.
+
 * Are there important confounders that are not measured?
+
+See above - race and socioeconomic status stand out as two confounding variables
+that don't appear to be measured in this dataset.
 
 * Fit one or more suitable regression models and summarize the output.
 
+I'll fit the same model as `model2` in the text since Lumley explains what the 
+variables are in that model.
+
+```{r 56}
+fit <- svyglm(BPXSAR ~ sodium + potassium + RIDAGEYR + RIAGENDR + BMXBMI,
+                 design = des)
+summary(fit)
+```
+
+According to this model there is a .38 mm Hg expected increase in systolic
+blood pressure for every one unit increase in BMI after adjusting for age, sex,
+and daily sodium and potassium intake. In other words we'd expect a higher blood
+pressure amongst those with higher BMIs. 
+
 * Examine whether there is an interaction with age or sex.
+
+```{r 56_interaction}
+fit <- svyglm(BPXSAR ~ (RIDAGEYR + RIAGENDR)*I(BMXBMI - 25) + sodium + potassium,
+              design = des)
+summary(fit)
+```
+I center the BMI variable at 25 (roughly the marginal average) and fit the 
+model with the age and sex interactions with the centered BMI. The model fit 
+shows that there's a significant negative association with the BMI-age 
+interaction and no association with the gender/sex - age interaction. This 
+corresponds to a amplifying effect of age --- the older you are the lower your 
+blood pressure is, on average, a higher BMI will then also lead to a lower 
+expected blood pressure in addition to this affect.
 
 7. Prove that an unweighted regression estimator is approximately unbiased when
 the weights depend only on variables in the model. Specifically, if the true
