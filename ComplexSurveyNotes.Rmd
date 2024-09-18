@@ -2017,8 +2017,8 @@ estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
 true_stderr <- as_tibble(apply(total_sims, 1, sd)) %>%
-  mutate(label = "Truth", Candidate = c("Bush","Kerry", "Nader")) %>% 
-  spread(Candidate,value)
+  mutate(label = "Truth", Candidate = c("Bush", "Kerry", "Nader")) %>%
+  spread(Candidate, value)
 
 rbind(estimated_stderrs, true_stderr) %>%
   gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>%
@@ -2169,7 +2169,7 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   mutate(num_agencies = n_distinct(Agency)) %>%
   ungroup() %>%
   select(
-    County, Agency, Population, murder_and_crime, 
+    County, Agency, Population, murder_and_crime,
     violent_crime, property_crime,
     num_counties, num_agencies
   )
@@ -2406,15 +2406,16 @@ sipp_hh_sub %>%
     rent_pct_gt_thrd = (pct_income_rent > 0.33) * 1
   ) %>%
   # avoid divide by zero error
-  filter(thtotinc >0) %>% 
+  filter(thtotinc > 0) %>%
   summarize(
     prop_pays_rent = survey_mean(pays_rent),
     mean_pct_income_rent = survey_mean(pct_income_rent, na.rm = TRUE),
-    quantile_pct_income_rent = survey_quantile(pct_income_rent, 
-                                                   na.rm = TRUE, 
-                                                   quantiles = c(.75,.95)),
+    quantile_pct_income_rent = survey_quantile(pct_income_rent,
+      na.rm = TRUE,
+      quantiles = c(.75, .95)
+    ),
     prop_rent_gt_thrd = survey_mean(rent_pct_gt_thrd, na.rm = TRUE)
-  ) %>% 
+  ) %>%
   pivot_longer(cols = everything(), names_to = "Rent", values_to = "Estimates")
 ```
 
@@ -2481,8 +2482,8 @@ estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
 true_stderr <- as_tibble(apply(total_sims, 1, sd)) %>%
-  mutate(label = "Truth", Candidate = c("Bush","Kerry", "Nader")) %>% 
-  spread(Candidate,value)
+  mutate(label = "Truth", Candidate = c("Bush", "Kerry", "Nader")) %>%
+  spread(Candidate, value)
 
 rbind(estimated_stderrs, true_stderr) %>%
   gather(everything(), -label, key = "Candidate", value = "Vote Std.Err") %>%
@@ -2509,7 +2510,6 @@ errors from the single-stage with replacement approxmiation and to the true
 simulation standard error.
 
 ```{r 310}
-
 ```
 
 3.11 Since 1999, NHANES has been conducting surveys continuously with data 
@@ -2618,7 +2618,7 @@ to see if these data were available in the `svycdf` object but they were not.
 
 
 ```{r svycdf}
-cdf.est <- svycdf(~enroll + api00 + api99, dstrata)
+cdf.est <- svycdf(~ enroll + api00 + api99, dstrata)
 
 cdf.pop <- ecdf(apipop$enroll)
 
@@ -2626,17 +2626,23 @@ cdf.samp <- ecdf(apistrat$enroll)
 
 par(mar = c(4.1, 4.1, 1.1, 2.1))
 
-plot(cdf.pop, do.points = FALSE, xlab = "enrollment",
-     ylab = "Cumulative probability", 
-     main = "Cumulative Distribution of California School Size",
-     sub = "Reproduces Lumley Fig 4.6", lwd = 1)
+plot(cdf.pop,
+  do.points = FALSE, xlab = "enrollment",
+  ylab = "Cumulative probability",
+  main = "Cumulative Distribution of California School Size",
+  sub = "Reproduces Lumley Fig 4.6", lwd = 1
+)
 
 lines(cdf.samp, do.points = FALSE, lwd = 2)
-lines(cdf.est[[1]], lwd = 2, col.vert = "grey60", col.hor = "grey60",
-      do.points = FALSE)
-legend("bottomright", lwd = c(1,2,2), bty = "n", 
-       col = c("black", "grey60", "black"), 
-       legend = c("Population", "Weighted estimate", "Unweighted Estimate"))
+lines(cdf.est[[1]],
+  lwd = 2, col.vert = "grey60", col.hor = "grey60",
+  do.points = FALSE
+)
+legend("bottomright",
+  lwd = c(1, 2, 2), bty = "n",
+  col = c("black", "grey60", "black"),
+  legend = c("Population", "Weighted estimate", "Unweighted Estimate")
+)
 ```
 Next Lumley plots an adjusted 
 [kaplan meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator) 
@@ -2683,16 +2689,18 @@ created in answering the questions for chapter 3. His code is equivalent.
 
 ```{r boxplots}
 ## Lumley's code
-#nhanes <- svydesign(id = ~SDMVPSU, strat = ~SDMVSTRA,
+# nhanes <- svydesign(id = ~SDMVPSU, strat = ~SDMVSTRA,
 #                    weights = ~WTMEC2YR, data = both, nest = TRUE)
 
 ## I use the bpdf design from the chapter 3 questions
-nhanes <- bpdf_design %>% 
+nhanes <- bpdf_design %>%
   mutate(
     age_group = cut(RIDAGEYR, c(0, 20, 30, 40, 50, 60, 80, Inf)),
   )
-svyboxplot(BPXSAR ~ age_group, subset(nhanes, BPXSAR > 0), col = "gray80",
-           varwidth = TRUE, ylab = "Systolic BP (mmHg)", xlab = "Age")
+svyboxplot(BPXSAR ~ age_group, subset(nhanes, BPXSAR > 0),
+  col = "gray80",
+  varwidth = TRUE, ylab = "Systolic BP (mmHg)", xlab = "Age"
+)
 ```
 The plot shows the distribution in blood pressure across the different age 
 groups. I already showed how I visualized this previously, but it is nice
@@ -2712,18 +2720,24 @@ proportion. I reproduce Lumley's Figure 4.12 below demonstrating how this
 works.
 
 ```{r svyhist}
-svyhist(~BPXSAR, subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0), main = "",
-        col="grey80", xlab="Systolic BP (mmHg)")
-lines(svysmooth(~BPXSAR,  nhanes, bandwidth = 5,
-                subset = subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0)), lwd = 2)
+svyhist(~BPXSAR, subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0),
+  main = "",
+  col = "grey80", xlab = "Systolic BP (mmHg)"
+)
+lines(svysmooth(~BPXSAR, nhanes,
+  bandwidth = 5,
+  subset = subset(nhanes, RIDAGEYR > 20 & BPXSAR > 0)
+), lwd = 2)
 ```
 
 This looks considerably different then the naive estimate, again showcasing
 the need for taking the design into account.
 
 ```{r naive_hist}
-hist(bpdf_design$variables$BPXSAR, xlab = "Systolic BP (mmHg)",
-     main = "Naive Distribution of Blood Pressure")
+hist(bpdf_design$variables$BPXSAR,
+  xlab = "Systolic BP (mmHg)",
+  main = "Naive Distribution of Blood Pressure"
+)
 ```
 
 
@@ -2748,15 +2762,19 @@ diastolic blood pressure from the NHANES design.
 
 
 ```{r}
-#TODO(petersonadam): Try plotting the api data here too
+# TODO(petersonadam): Try plotting the api data here too
 par(mfrow = c(1, 2))
-svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "bubble", 
-        xlab = "Diastolic pressure (mmHg)",
-        ylab = "Systolic pressure (mmHg)")
-svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "transparent",
-        pch = 19, alpha = c(0, 0.5), 
-        xlab = "Diastolic pressure (mmHg)",
-        ylab = "Systolic pressure (mmHg)")
+svyplot(BPXSAR ~ BPXDAR,
+  design = nhanes, style = "bubble",
+  xlab = "Diastolic pressure (mmHg)",
+  ylab = "Systolic pressure (mmHg)"
+)
+svyplot(BPXSAR ~ BPXDAR,
+  design = nhanes, style = "transparent",
+  pch = 19, alpha = c(0, 0.5),
+  xlab = "Diastolic pressure (mmHg)",
+  ylab = "Systolic pressure (mmHg)"
+)
 ```
 
 As Lumley notes, this is a case in which the sampling weights --- bubble size 
@@ -2773,10 +2791,12 @@ in order to ensure that any features visualized are not "noise" from the
 sampling process.
 
 ```{r subsample}
-svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "subsample", 
-        sample.size = 1000,
-        xlab = "Diastolic pressure (mmHg)",
-        ylab = "Systolic pressure (mmHg)")
+svyplot(BPXSAR ~ BPXDAR,
+  design = nhanes, style = "subsample",
+  sample.size = 1000,
+  xlab = "Diastolic pressure (mmHg)",
+  ylab = "Systolic pressure (mmHg)"
+)
 ```
 #### Aggregation and smoothing
 
@@ -2792,9 +2812,11 @@ Lumley's first example of this is a hexplot - a plot where a grid of hexagons
 is created and sized according to the number of points within the hex-bin.
 
 ```{r hexplot}
-svyplot(BPXSAR ~ BPXDAR, design = nhanes, style = "hex", legend = 0, 
-        xlab = "Diastolic pressure (mmHg)",
-        ylab = "Systolic pressure (mmHg)")
+svyplot(BPXSAR ~ BPXDAR,
+  design = nhanes, style = "hex", legend = 0,
+  xlab = "Diastolic pressure (mmHg)",
+  ylab = "Systolic pressure (mmHg)"
+)
 ```
 
 This is perhaps the best visualization of the data thus far, where the "blob"
@@ -2814,25 +2836,39 @@ package. Mean estimates can also be obtained by using `method = 'locpoly'`.
 
 ```{r scatterplot_smoother}
 adults <- subset(nhanes, !is.na(BPXSAR))
-a25 <- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
-                 quantile = .25, df = 4)
-a50<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
-                 quantile = .5, df = 4)
-a75<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
-                 quantile = .75, df = 4)
-a10<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
-                 quantile = .1, df = 4)
-a90<- svysmooth(BPXSAR ~ RIDAGEYR, method = "quantreg", design = adults,
-                 quantile = .9, df = 4)
-plot(BPXSAR ~ RIDAGEYR, data = nhanes, type = "n", ylim = c(80, 200),
-     xlab = "Age", ylab = "Systolic Pressure")
+a25 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .25, df = 4
+)
+a50 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .5, df = 4
+)
+a75 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .75, df = 4
+)
+a10 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .1, df = 4
+)
+a90 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .9, df = 4
+)
+plot(BPXSAR ~ RIDAGEYR,
+  data = nhanes, type = "n", ylim = c(80, 200),
+  xlab = "Age", ylab = "Systolic Pressure"
+)
 lines(a50, lwd = 3)
 lines(a25, lwd = 1)
 lines(a75, lwd = 1)
 lines(a10, lty = 3)
 lines(a90, lty = 3)
-legend("topleft", legend = c("10%,90%", "25%, 75%", "median"),
-       lwd = c(1, 1, 3), lty = c(3, 1, 1), bty = "n")
+legend("topleft",
+  legend = c("10%,90%", "25%, 75%", "median"),
+  lwd = c(1, 1, 3), lty = c(3, 1, 1), bty = "n"
+)
 ```
 
 #### Conditioning Plots
@@ -2848,13 +2884,13 @@ the scales are not dramatically different.
 
 
 ```{r svycoplot}
-svycoplot(BPXSAR ~ BPXDAR | equal.count(RIDAGEMN), 
-          style = "hex",  # or "transparent" for shaded hexs,
-          # hexscale = "absolute" # for fixed scales across facets.
-          design = subset(nhanes, BPXDAR > 0), xbins = 20,
-          strip = strip.custom(var.name = "AGE"),
-          xlab = "Diastolic pressure (mm Hg)",
-          ylab = "Systolic pressure (mm Hg)"
+svycoplot(BPXSAR ~ BPXDAR | equal.count(RIDAGEMN),
+  style = "hex", # or "transparent" for shaded hexs,
+  # hexscale = "absolute" # for fixed scales across facets.
+  design = subset(nhanes, BPXDAR > 0), xbins = 20,
+  strip = strip.custom(var.name = "AGE"),
+  xlab = "Diastolic pressure (mm Hg)",
+  ylab = "Systolic pressure (mm Hg)"
 )
 ```
 
@@ -2881,19 +2917,20 @@ Lumley's [website](https://r-survey.r-forge.r-project.org/svybook/) ---
 search for "BRFSS".
 
 ```{r}
-states <- read_sf("Data/BRFSS2007/brfss_state_2007_download.shp") %>% 
+states <- read_sf("Data/BRFSS2007/brfss_state_2007_download.shp") %>%
   arrange(ST_FIPS)
 bys <- svyby(~X_FRTSERV, ~X_STATE, svymean,
-             design = subset(brfss, X_FRTSERV < 99999))
-state_fruit_servings <- states %>% 
-  select(ST_FIPS) %>% 
-  st_drop_geometry() %>% 
-  left_join(bys, by = c("ST_FIPS" = "X_STATE")) %>% 
-  mutate(geometry = states$geometry) %>% 
+  design = subset(brfss, X_FRTSERV < 99999)
+)
+state_fruit_servings <- states %>%
+  select(ST_FIPS) %>%
+  st_drop_geometry() %>%
+  left_join(bys, by = c("ST_FIPS" = "X_STATE")) %>%
+  mutate(geometry = states$geometry) %>%
   st_as_sf()
-  
-state_fruit_servings %>% 
-  ggplot() + 
+
+state_fruit_servings %>%
+  ggplot() +
   geom_sf(aes(fill = X_FRTSERV / 100)) +
   theme_void() +
   theme(legend.title = element_blank()) +
@@ -2902,34 +2939,38 @@ state_fruit_servings %>%
 
 
 ```{r brfss_fruit_age}
-hlth <- brfss %>% 
-  as_survey_design() %>% 
-  mutate(agegp = cut(AGE, c(0, 35, 50, 65, Inf)),
-         state = X_STATE,
-         covered = (HLTHPLAN == 1) * 1 ) %>% 
-  group_by(agegp, state) %>% 
+hlth <- brfss %>%
+  as_survey_design() %>%
+  mutate(
+    agegp = cut(AGE, c(0, 35, 50, 65, Inf)),
+    state = X_STATE,
+    covered = (HLTHPLAN == 1) * 1
+  ) %>%
+  group_by(agegp, state) %>%
   summarize(
     health_coverage = survey_mean(covered)
-  ) %>% 
+  ) %>%
   ## Formatting
-  mutate(Age = case_when(agegp == "(0,35]" ~ "<35",
-                         agegp == "(35,50]" ~ "35-50",
-                         agegp == "(50,65]" ~ "50-65",
-                         agegp == "(65,Inf]" ~ "65+"))
+  mutate(Age = case_when(
+    agegp == "(0,35]" ~ "<35",
+    agegp == "(35,50]" ~ "35-50",
+    agegp == "(50,65]" ~ "50-65",
+    agegp == "(65,Inf]" ~ "65+"
+  ))
 
 
 
-insurance_coverage <- states %>% 
-  select(ST_FIPS,geometry) %>% 
-  left_join(hlth, by = c("ST_FIPS" = "state")) %>% 
+insurance_coverage <- states %>%
+  select(ST_FIPS, geometry) %>%
+  left_join(hlth, by = c("ST_FIPS" = "state")) %>%
   st_as_sf()
 
-insurance_coverage %>% 
+insurance_coverage %>%
   ggplot(aes(fill = health_coverage)) +
   geom_sf() +
   facet_wrap(~Age) +
   theme_void() +
-  theme(legend.title = element_blank()) 
+  theme(legend.title = element_blank())
 ```
 
 Lumley then shows two plots with insurance coverage at the state level. 
@@ -2941,20 +2982,21 @@ I've just created some fake simulated data and created a plot with the
 equivalent data.
 
 ```{r city_data}
-cities <- read_sf("Data/BRFSS2007/BRFSS_MMSA_2007.shp") %>% 
+cities <- read_sf("Data/BRFSS2007/BRFSS_MMSA_2007.shp") %>%
   filter(NAME != "Columbus") %>%
-  transmute(Insurance = cut(rbeta(n(),1,1),c(0,0.25,.5,.75,1)))
+  transmute(Insurance = cut(rbeta(n(), 1, 1), c(0, 0.25, .5, .75, 1)))
 
 marginal_insurance <- brfss %>%
   as_survey_design() %>%
   mutate(
     covered = (HLTHPLAN == 1) * 1,
     state = X_STATE,
-    ) %>%
+  ) %>%
   group_by(state) %>%
   summarize(
     health_coverage = survey_mean(covered)
-  ) %>% ungroup()
+  ) %>%
+  ungroup()
 
 map_data <- states %>%
   select(ST_FIPS, geometry) %>%
@@ -3014,9 +3056,10 @@ some outlying households that report much higher rent than income.
 varies with age as we did with blood pressure in this chapter.
 
 ```{r}
-plot(svysmooth(bmi_p ~ srage_p, chis), 
-     xlab = "Age", ylab = "BMI",
-     main = "BMI vs. Age (CHIS data)")
+plot(svysmooth(bmi_p ~ srage_p, chis),
+  xlab = "Age", ylab = "BMI",
+  main = "BMI vs. Age (CHIS data)"
+)
 ```
 
 We see a very distinctive U-shape - with middle aged indviduals - 50 to 60 year
@@ -3387,20 +3430,22 @@ text.
 demo <- haven::read_xpt("data/nhanesxpt/demo_c.xpt")[, c(1:8, 28:31)]
 bp <- haven::read_xpt("data/nhanesxpt/bpx_c.xpt")
 bm <- haven::read_xpt("data/nhanesxpt/bmx_c.xpt")[, c("SEQN", "BMXBMI")]
-diet <- haven::read_xpt("data/nhanesxpt/dr1tot_c.xpt")[, c(1:52, 63,64)]
+diet <- haven::read_xpt("data/nhanesxpt/dr1tot_c.xpt")[, c(1:52, 63, 64)]
 nhanes34 <- merge(demo, bp, by = "SEQN")
 nhanes34 <- merge(nhanes34, bm, by = "SEQN")
 nhanes34 <- merge(nhanes34, diet, by = "SEQN")
 
-demo5 <- haven::read_xpt("data/nhanesxpt/demo_d.xpt")[, c(1:8,39:42)]
+demo5 <- haven::read_xpt("data/nhanesxpt/demo_d.xpt")[, c(1:8, 39:42)]
 bp5 <- haven::read_xpt("data/nhanesxpt/bpx_x.xpt")
 
-bp5$BPXSAR <- rowMeans(bp5[,c("BPXSY1","BPXSY2","BPXSY3","BPXSY4")], 
-                       na.rm = TRUE)
-bp5$BPXDAR <-  rowMeans(bp5[,c("BPXDI1","BPXDI2","BPXDI3","BPXDI4")], 
-                       na.rm = TRUE)
+bp5$BPXSAR <- rowMeans(bp5[, c("BPXSY1", "BPXSY2", "BPXSY3", "BPXSY4")],
+  na.rm = TRUE
+)
+bp5$BPXDAR <- rowMeans(bp5[, c("BPXDI1", "BPXDI2", "BPXDI3", "BPXDI4")],
+  na.rm = TRUE
+)
 bm5 <- haven::read_xpt("data/nhanesxpt/bmx_d.xpt")[, c("SEQN", "BMXBMI")]
-diet5 <- haven::read_xpt("data/nhanesxpt/dr1tot_d.xpt")[, c(1:52,64,65)]
+diet5 <- haven::read_xpt("data/nhanesxpt/dr1tot_d.xpt")[, c(1:52, 64, 65)]
 
 
 nhanes56 <- merge(demo5, bp5, by = "SEQN")
@@ -3411,11 +3456,13 @@ nhanes <- rbind(nhanes34, nhanes56)
 nhanes$fouryearwt <- nhanes$WTDRD1 / 2
 # I added the two lines below to make graphing the
 # smooth plot easier
-nhanes$sodium <- nhanes$DR1TSODI / 1000 
-nhanes$potassium <- nhanes$DR1TPOTA / 1000 
+nhanes$sodium <- nhanes$DR1TSODI / 1000
+nhanes$potassium <- nhanes$DR1TPOTA / 1000
 
-des <- svydesign(id = ~SDMVPSU, strat = ~SDMVSTRA, weights = ~fouryearwt,
-                 nest = TRUE, data = subset(nhanes, !is.na(WTDRD1)))
+des <- svydesign(
+  id = ~SDMVPSU, strat = ~SDMVSTRA, weights = ~fouryearwt,
+  nest = TRUE, data = subset(nhanes, !is.na(WTDRD1))
+)
 
 des <- update(des, sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000)
 des
@@ -3430,8 +3477,10 @@ the association between sodium and blood pressure is confounded by age.
 
 ```{r svysmoothplot}
 plot(BPXSAR ~ sodium, data = nhanes, type = "n")
-points(svyplot(BPXSAR ~ sodium, design = des, style = "transparent", xlab = 
-          "Dietary Sodium (g/day)", ylab = "Systolic Blood Pressure (mm Hg)"))
+points(svyplot(BPXSAR ~ sodium,
+  design = des, style = "transparent", xlab =
+    "Dietary Sodium (g/day)", ylab = "Systolic Blood Pressure (mm Hg)"
+))
 lines((svysmooth(BPXSAR ~ sodium, des)))
 ```
 To test this hypothesis, Lumley first visualizes the three variables using the
@@ -3440,10 +3489,11 @@ conditional plot demonstrated previously.
 
 ```{r nacl_coplot}
 svycoplot(BPXSAR ~ sodium | equal.count(RIDAGEYR), des,
-          style = "hexbin",
-          xlab = "Dietary Sodium (g/day)",
-          ylab = "Systolic BP (mmHg)",
-          strip = strip.custom(var.name = "Age"))
+  style = "hexbin",
+  xlab = "Dietary Sodium (g/day)",
+  ylab = "Systolic BP (mmHg)",
+  strip = strip.custom(var.name = "Age")
+)
 ```
 
 In the above plot we see a greater indication that as dietary sodium increases
@@ -3477,12 +3527,13 @@ function.
 
 ```{r nacl_model2}
 model2 <- svyglm(BPXSAR ~ sodium + potassium + RIDAGEYR + RIAGENDR + BMXBMI,
-                 design = des)
+  design = des
+)
 summary(model2)
 ```
 
 ```{r nacl_test_models}
-regTermTest(model2, ~potassium + sodium, df = NULL)
+regTermTest(model2, ~ potassium + sodium, df = NULL)
 ```
 
 The test is formally examining whether a model with these terms is more 
@@ -3502,13 +3553,15 @@ the observed sodium intake. I replicate Lumley's code below.
 
 ```{r partial_residual_plot}
 par(mfrow = c(1, 2))
-plot(as.vector(predict(model1)), resid(model1), 
-     xlab = "Fitted Values", ylab = "Residuals")
+plot(as.vector(predict(model1)), resid(model1),
+  xlab = "Fitted Values", ylab = "Residuals"
+)
 nonmissing <- des[-model1$na.action]
 plot(nonmissing$variables$sodium,
-     resid(model1, "partial")[,1],
-     xlab = "Sodium", 
-     ylab = "Partial Residuals")
+  resid(model1, "partial")[, 1],
+  xlab = "Sodium",
+  ylab = "Partial Residuals"
+)
 ```
 
 
@@ -3516,13 +3569,16 @@ plot(nonmissing$variables$sodium,
 nonmissing <- des[-model1$na.action]
 par(mfrow = c(1, 2))
 plot(model1, panel = make.panel.svysmooth(nonmissing))
-termplot(model1, data = model.frame(nonmissing),
-         partial = TRUE, se = TRUE, smooth = make.panel.svysmooth(nonmissing))
+termplot(model1,
+  data = model.frame(nonmissing),
+  partial = TRUE, se = TRUE, smooth = make.panel.svysmooth(nonmissing)
+)
 ```
 
 ```{r}
-int1 <- svyglm(BPXSAR ~ (sodium+potassium)*I(RIDAGEYR-40) + RIAGENDR + BMXBMI,
-               design = des)
+int1 <- svyglm(BPXSAR ~ (sodium + potassium) * I(RIDAGEYR - 40) + RIAGENDR + BMXBMI,
+  design = des
+)
 summary(int1)
 ```
 ### Is Weighting Needed in a Regression Model ?
@@ -3569,14 +3625,14 @@ data from the sampled counties. Estimate the total number of murders and
 burglaries in the state.
 
 ```{r wacrime_51a}
-county_sample <- wa_crime_df %>% 
-  distinct(County) %>% 
-  slice_sample(n = 10) %>% 
+county_sample <- wa_crime_df %>%
+  distinct(County) %>%
+  slice_sample(n = 10) %>%
   pull(County)
 
-wa_crime_df %>% 
-  filter(County %in% county_sample) %>% 
-  as_survey_design() %>% 
+wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design() %>%
   summarize(
     crime = survey_total(murder_and_crime)
   )
@@ -3586,12 +3642,12 @@ wa_crime_df %>%
 totals.
 
 ```{r wacrime_51b}
-ratio_estimate <- wa_crime_df %>% 
-  filter(County %in% county_sample) %>% 
-  as_survey_design() %>% 
+ratio_estimate <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design() %>%
   svyratio(~murder_and_crime, ~Population, design = .)
 
-predict(ratio_estimate, total = sum(wa_crime_df$Population)) 
+predict(ratio_estimate, total = sum(wa_crime_df$Population))
 ```
 
 * Use the numbers of murders and burglaries in the previous year as auxiliary 
@@ -3615,32 +3671,34 @@ wa_crime_03_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>
     num_counties, num_agencies
   )
 
-model_df <- wa_crime_03_df %>% 
-  mutate(year = "2003") %>% 
-  bind_rows(wa_crime_df %>% mutate(year = "2004")) %>% 
+model_df <- wa_crime_03_df %>%
+  mutate(year = "2003") %>%
+  bind_rows(wa_crime_df %>% mutate(year = "2004")) %>%
   mutate(
     # We'll use 2004's numbers here for the fpc.
     num_counties = if_else(year == "2004", num_counties, 0),
     num_agencies = if_else(year == "2004", num_agencies, 0),
-  ) %>% 
-  spread(year, murder_and_crime) %>% 
-  group_by(County,Agency) %>% 
-  summarize( 
+  ) %>%
+  spread(year, murder_and_crime) %>%
+  group_by(County, Agency) %>%
+  summarize(
     num_counties = sum(num_counties),
     num_agencies = sum(num_agencies),
-    `2003` = sum(replace_na(`2003`,0)),
-    `2004` = sum(replace_na(`2004`,0))
-  ) %>% 
-  ungroup() %>% 
+    `2003` = sum(replace_na(`2003`, 0)),
+    `2004` = sum(replace_na(`2004`, 0))
+  ) %>%
+  ungroup() %>%
   filter(
-    # Agencies were removed between 2003 and 2004. 
+    # Agencies were removed between 2003 and 2004.
     num_counties > 0, num_agencies > 0,
     County %in% county_sample
-    ) 
+  )
 
-model_design <- model_df %>%  
-  as_survey_design(id = c(County, Agency),
-                   fpc = c(num_counties, num_agencies))
+model_design <- model_df %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  )
 
 fit <- svyglm(`2004` ~ `2003`, design = model_design)
 
@@ -3662,35 +3720,36 @@ next, without measuring the total population, explicitly.
  ratio estimate of the population totals.
 
 ```{r wacrime_51d}
-smaller_county_sample <- wa_crime_df %>% 
-  distinct(County) %>% 
-  filter(County != "king") %>% 
-  slice_sample(n = 5) %>% 
+smaller_county_sample <- wa_crime_df %>%
+  distinct(County) %>%
+  filter(County != "king") %>%
+  slice_sample(n = 5) %>%
   pull(County)
 
 county_list <- unique(wa_crime_df$County)
 
-design <- wa_crime_df %>% 
-  filter(County == "king" | County %in% smaller_county_sample) %>% 
+design <- wa_crime_df %>%
+  filter(County == "king" | County %in% smaller_county_sample) %>%
   mutate(
     strata_label = if_else(County == "king", "King County", "WA Counties"),
     num_counties = if_else(County == "king", 1, length(county_list) - 1)
-  ) %>% 
+  ) %>%
   as_survey_design(
     ids = c(County, Agency),
     fpc = c(num_counties, num_agencies),
     strata = strata_label
   )
 
-strata_totals <- wa_crime_df %>% 
-  mutate(strata = if_else(County == "king","King", "WA Counties")) %>% 
-  group_by(strata) %>% 
-  summarize(Population = sum(Population)) %>% 
-  spread(strata,Population) %>% 
+strata_totals <- wa_crime_df %>%
+  mutate(strata = if_else(County == "king", "King", "WA Counties")) %>%
+  group_by(strata) %>%
+  summarize(Population = sum(Population)) %>%
+  spread(strata, Population) %>%
   as.matrix()
 
 separate_estimator <- svyratio(~murder_and_crime, ~Population, design,
-                               separate = TRUE)
+  separate = TRUE
+)
 common_estimator <- svyratio(~murder_and_crime, ~Population, design)
 predict(separate_estimator, total = strata_totals)
 ```
@@ -3726,7 +3785,8 @@ design <- wa_crime_df %>%
 
 
 separate_estimator <- svyratio(~murder_and_crime, ~Population, design,
-                               separate = TRUE)
+  separate = TRUE
+)
 common_estimator <- svyratio(~murder_and_crime, ~Population, design)
 predict(separate_estimator, total = strata_totals)
 ```
@@ -3755,14 +3815,14 @@ wa_crime_df %>%
     id = c(County, Agency),
     fpc = c(num_counties, num_agencies),
     strata = strata_label
-  ) %>% 
+  ) %>%
   summarize(
     violent_non_violent = survey_ratio(violent_crime, property_crime)
   )
 ```
 
 ```{r wacrime_52_check}
-round(sum(wa_crime_df$violent_crime) / sum(wa_crime_df$property_crime),2)
+round(sum(wa_crime_df$violent_crime) / sum(wa_crime_df$property_crime), 2)
 ```
 
 We can see that the estimate is quite close to the population value
@@ -3778,7 +3838,7 @@ total household monthly income - earlier we used `thtotinc` for this measure
 as he had increating Figure 3.9. Consequently, I use `thtotinc` below.
 
 ```{r 53a_1}
-sipp_hh_sub %>% 
+sipp_hh_sub %>%
   # Total population
   summarize(
     ratio_of_monthly_rent_to_household_income = survey_ratio(tmthrnt, thtotinc)
@@ -3786,8 +3846,8 @@ sipp_hh_sub %>%
 ```
 
 ```{r 53a_2}
-sipp_hh_sub %>% 
-  filter(tmthrnt > 0) %>% 
+sipp_hh_sub %>%
+  filter(tmthrnt > 0) %>%
   # Rent paying subpopulation
   summarize(
     ratio_of_monthly_rent_to_household_income = survey_ratio(tmthrnt, thtotinc)
@@ -3799,26 +3859,26 @@ over the subpopulation who pay rent.
 
 ```{r 53b_1}
 # Full Population
-sipp_hh_sub %>% 
+sipp_hh_sub %>%
   mutate(
     # I also ran the numbers if we excluded those with 0 household rent
     # and the estimates are effectively the same.
     prop_income_rent = if_else(thtotinc == 0, 0, (tmthrnt / thtotinc)),
-  ) %>% 
+  ) %>%
   summarize(
     prop_income_rent_est = survey_mean(prop_income_rent)
   )
 ```
 
 ```{r 53b_2}
-sipp_hh_sub %>% 
+sipp_hh_sub %>%
   # Rent paying subpopulation
-  filter(tmthrnt > 0) %>% 
+  filter(tmthrnt > 0) %>%
   mutate(
     # I also ran the numbers if we excluded those with 0 household rent
     # and the estimates are effectively the same.
-    prop_income_rent = if_else(thtotinc == 0, 0, (tmthrnt / thtotinc)) ,
-  ) %>% 
+    prop_income_rent = if_else(thtotinc == 0, 0, (tmthrnt / thtotinc)),
+  ) %>%
   summarize(
     prop_income_rent_est = survey_mean(prop_income_rent)
   )
@@ -3903,18 +3963,21 @@ svyhist(~emer, strat_design)
 ```
 
 ```{r 54_emer_eda}
-svyplot(api00 ~ emer, strat_design, 
-        main = "CA 2000 API Scores vs. Teacher Emergency Training Preparedness",
-        xlab = "Teachers with emergency training",
-        ylab = "API 2000")
+svyplot(api00 ~ emer, strat_design,
+  main = "CA 2000 API Scores vs. Teacher Emergency Training Preparedness",
+  xlab = "Teachers with emergency training",
+  ylab = "API 2000"
+)
 ```
 
 * What is the conclusion at the end?
 
 ```{r 54}
-fit <- svyglm(api00 ~ emer + meals + hsg + avg.ed + comp.imp +
-                acs.k3 + acs.46 + ell + full + enroll,
-              design = strat_design)
+fit <- svyglm(
+  api00 ~ emer + meals + hsg + avg.ed + comp.imp +
+    acs.k3 + acs.46 + ell + full + enroll,
+  design = strat_design
+)
 summary(fit)
 ```
 
@@ -3928,8 +3991,8 @@ level.
 population (the data set `apipop`) using the `glm()` function.
 
 ```{r 55}
-fit_pop <- glm(api00 ~  emer + meals + hsg + avg.ed + comp.imp +
-                acs.k3 + acs.46 + ell + full + enroll, data = apipop)
+fit_pop <- glm(api00 ~ emer + meals + hsg + avg.ed + comp.imp +
+  acs.k3 + acs.46 + ell + full + enroll, data = apipop)
 summary(fit_pop)
 ```
 
@@ -3953,22 +4016,22 @@ sampling distribution of the coefficients close to a Normal distribution?
 
 ```{r 55_c}
 OneSimulation <- function() {
-  coefs <- apipop %>% 
-    group_by(stype) %>% 
-    slice_sample(n = 66) %>% 
-    ungroup() %>% 
+  coefs <- apipop %>%
+    group_by(stype) %>%
+    slice_sample(n = 66) %>%
+    ungroup() %>%
     as_survey_design(
       strata = stype
-    ) %>% 
-    svyglm(api00 ~  emer + meals + hsg + avg.ed + comp.imp +
-                acs.k3 + acs.46 + ell + full + enroll, design = .) %>% 
+    ) %>%
+    svyglm(api00 ~ emer + meals + hsg + avg.ed + comp.imp +
+      acs.k3 + acs.46 + ell + full + enroll, design = .) %>%
     coef(.)
   return(coefs)
 }
 coef_dist <- replicate(100, OneSimulation())
-par(mfrow = c(1,2))
-hist(coef_dist[1,], main = "Histogram of Intercept")
-hist(coef_dist[2,], main = "Histogram of emer")
+par(mfrow = c(1, 2))
+hist(coef_dist[1, ], main = "Histogram of Intercept")
+hist(coef_dist[2, ], main = "Histogram of emer")
 ```
 
 Yes, as we'd expect the sampling distributions are roughly normal.
@@ -3997,7 +4060,8 @@ variables are in that model.
 
 ```{r 56}
 fit <- svyglm(BPXSAR ~ sodium + potassium + RIDAGEYR + RIAGENDR + BMXBMI,
-                 design = des)
+  design = des
+)
 summary(fit)
 ```
 
@@ -4009,8 +4073,9 @@ pressure amongst those with higher BMIs.
 * Examine whether there is an interaction with age or sex.
 
 ```{r 56_interaction}
-fit <- svyglm(BPXSAR ~ (RIDAGEYR + RIAGENDR)*I(BMXBMI - 25) + sodium + potassium,
-              design = des)
+fit <- svyglm(BPXSAR ~ (RIDAGEYR + RIAGENDR) * I(BMXBMI - 25) + sodium + potassium,
+  design = des
+)
 summary(fit)
 ```
 I center the BMI variable at 25 (roughly the marginal average) and fit the 
@@ -4160,13 +4225,117 @@ Lumley notes that if the api dataset were a real survey, non response might vary
 as a function of school type and in which case post-stratification could help
 reduce non-response bias.
 
-### Raking
+## Raking
 
 If one were to post-stratify using more than one variable would require the
 complete joint distribution of both variables. This can be problematic either
 because the data for the joint distribution - or cross classification as Lumley
 calls it - is not available, or because one of the cross - strata have no
 observations in the sample.
+
+
+```{r}
+load("Data/Family Resource Survey/frs.rda")
+frs.des <- svydesign(ids = ~PSU, data = frs)
+pop.ctband <- data.frame(
+  CTBAND = 1:9,
+  Freq = c(
+    515672, 547548, 351599, 291425,
+    266257, 147851, 87767, 9190, 19670
+  )
+)
+pop.tenure <- data.frame(
+  TENURE = 1:4,
+  Freq = c(1459205, 493237, 128189, 156348)
+)
+
+frs.raked <- rake(frs.des,
+  sample = list(~CTBAND, ~TENURE),
+  population = list(pop.ctband, pop.tenure)
+)
+overall <- svymean(~HHINC, frs.raked)
+with_children <- svymean(~HHINC, subset(frs.raked, DEPCHLDH > 0))
+children_singleparent <- svymean(~HHINC, subset(frs.raked, DEPCHLDH > 0 & ADULTH == 1))
+c(
+  "Overall" = overall,
+  "With Children" = with_children,
+  "Single Parent" = children_singleparent
+)
+```
+
+## Generalized Raking, Greg Estimation, and Calibration
+
+Lumley identifies two ways to understand post-stratification:
+
+1. Post-stratification makes small changes to the sampling weights such that the 
+estimated totals match the population totals.
+
+2. Post-stratification is a rgression estimator, where each post-stratum is 
+an indicator in a regression model.
+
+An extension of the first view leads to calibration estimators while the 
+second leads to generalized regression estimators. The former requires 
+correctly specifying how to change the weights, the second requires correctly
+specifying the model. Both can lead to great increases in precision of the
+target estimates.
+
+Lumley's motivation of calibration starts with the regression estimate of a
+population total: if we have the auxiliary variable $X_i$ available on all
+units in the population and an estimated $\hat{\beta}$ from a sample, we can
+estimate $\hat{T}$ as the sum of the predicted values from the regression.
+
+$$
+\hat{T}_{reg} = \sum_{i=1}^N X_i\hat{\beta}
+$$
+
+From this starting point, Lumley descibres that calibration follows a similar 
+form, with the unknown parameter $\hat{\beta}$ know a function of the 
+calibration weights $g_i$ and original sampling weights $\pi_i$ defined in such
+a way that the population total of $X$ is equal to the estimated total of $X$.
+Lumley identifies this as the *calibration constraints*:
+
+$$
+T_x = \sum_{i=1}^{n} \frac{g_i}{\pi_i} X_i.
+$$
+
+However, this constraint alone will not uniquely identify the $g_i$. 
+Consequently, the specification of calibration weights are completed by 
+requiring that they be "close" to the sampling weights - minimizing a distance
+function, while still satisfying the previous constraint. 
+
+Calibration provides a unified view of post-stratification and raking. As Lumley 
+states:
+
+> In linear regression calibration, the calibration weights $g_i$ are a linear 
+function of the auxiliary variables; in raking calibration the calibration
+weights are a multiplicative function of the auxiliary variables.
+
+Variance estimation proceeds in a similar fashion for calibration as it did
+for post-stratification, by constructing an unbiased estimator for the residual
+between $Y_i$ and the estimated mean, or population total.
+
+## Calibration in R
+
+**Linear regression calibration**
+
+We're in a similar spot as before with regard to the election data example.
+```{r calibration_demo}
+```
+
+
+```{r calibration_raking_demo}
+pop.size <- sum(pop.ctband$Freq)
+pop.totals <- c('(intercept)'=pop.size, pop.ctband$Freq[-1],
+                pop.tenure$Freq[-1])
+frs.cal <- calibrate(frs.des,
+                     formula = ~factor(CTBAND) + factor(TENURE),
+                     population = pop.totals,
+                     calfun = "raking")
+svymean(~HHINC, frs.cal)
+svymean(~HHINC, subset(frs.cal, DEPCHLDH > 0))
+svymean(~HHINC, subset(frs.cal, DEPCHLDH > 0 & ADULTH == 1))
+```
+
 
 # Chapter 8: Two-Phase Sampling
 
