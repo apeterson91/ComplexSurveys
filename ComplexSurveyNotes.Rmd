@@ -4228,10 +4228,20 @@ reduce non-response bias.
 ## Raking
 
 If one were to post-stratify using more than one variable would require the
-complete joint distribution of both variables. This can be problematic either
-because the data for the joint distribution - or cross classification as Lumley
-calls it - is not available, or because one of the cross - strata have no
-observations in the sample.
+complete joint distribution of both variables. This can be problematic 
+because the population totals for the joint distribution - or cross 
+classification as Lumley calls it - is not available. Raking is a method
+that aims to overcome this problem.
+
+> The process involves post-stratifying on each set of variables in turn, and 
+repeating this process until the weights stop changing.
+
+Lumley further highlights the connection between log-linear regression models
+and raking:
+
+> Raking could be considered a form of post-stratification where a log-linear 
+model is used to smooth out the sample and population tables before the weights
+are adjusted.
 
 
 ```{r}
@@ -4319,7 +4329,7 @@ between $Y_i$ and the estimated mean, or population total.
 **Linear regression calibration**
 
 We're in a similar spot as before with regard to the election data example.
-```{r calibration_demo}
+```{r calibration_demo, eval = FALSE}
 ```
 
 
@@ -4336,6 +4346,110 @@ svymean(~HHINC, subset(frs.cal, DEPCHLDH > 0))
 svymean(~HHINC, subset(frs.cal, DEPCHLDH > 0 & ADULTH == 1))
 ```
 
+#### Comparing calibration methods 
+
+
+```{r calibration_comparison_setup}
+clus1 <- svydesign(id = ~dnum, weights = ~pw, data = apiclus1, fpc = ~fpc)
+logit_cal <- calibrate(clus1, ~stype + api99,
+                       population = c(6194, 755, 1018, 3914069),
+                       calfun = "logit", bounds = c(0.7, 1.7))
+svymean(~api00, clus1)
+```
+
+```{r logit_calibration}
+svymean(~api00, logit_cal)
+```
+
+```{r calibration_comparison_regression}
+m0 <- svyglm(api00~ell + mobility + emer, clus1)
+summary(svyglm(api00~ell + mobility + emer, clus1))
+```
+```{r regression_calibration}
+m1 <- svyglm(api00 ~ ell + mobility + emer, logit_cal)
+summary(svyglm(api00 ~ ell + mobility + emer, logit_cal))
+```
+
+```{r calibration_prediction0}
+predict(m0, newdata = data.frame(ell=5, mobility = 10, emer = 10))
+```
+
+```{r calibration_prediction1}
+predict(m1, newdata = data.frame(ell=5, mobility = 10, emer = 10))
+```
+
+#### Cluster-level weights
+
+Although altering the weights can lead to higher precision of estimates 
+sampling weights applied to clusters - which are identical - can then lead
+to unintuitive results -- Lumley gives the example of mothers and infants 
+sampled together but the number of infants not adding up to the number of
+mothers when using the calibrated weights. Consequently, Lumley includes an
+option in the `survey` package to force within-cluster weights to be identical 
+when calibrated at a given stage --- denoted below by the `aggregate.stage` 
+argument.
+
+
+To illustrate Lumley uses the `clus2_design` from earlier in the chapter, where
+the design was post-stratified on school type. I don't really follow Lumley's
+argument here but he says that the there is a loss of precision because of the
+added constraints, but that's not what we see below or in the text - the 
+constrained calibration has a lower standard error than the post-stratified 
+design... Its hard to inspect things too carefully here because Lumley
+uses a `cal` variable that's assigned a calibration object, presumably, but
+does not show how he assigns it in the text, so we're left wondering.
+```{r cluster_calibrated_weights}
+cal2 <- calibrate(clus2_design, ~stype, 
+                  pop = c(4421 + 755 + 1018, 755, 1018),
+                  aggregate.stage = 1)
+svytotal(~enroll, cal2, na.rm = TRUE)
+```
+
+```{r cluster_calibrated_weights_psdesign}
+svytotal(~enroll, ps_design, na.rm = TRUE)
+```
+
+```{r calibration_weights_comparison, eval = FALSE}
+range(weights(cal) / weights(clus2_design))
+```
+
+```{r calibration2_weights_comparison}
+range(weights(cal2) / weights(clus2_design))
+```
+
+### Basu's Elephants
+
+Lumley walks through a classic story[@basu2011essay] in statistics about how  
+poor use of auxiliary information can lead to unreasonable behavior of design-
+based inference. Lumley then goes on to show how calibrated weights could make
+this more efficient. I'll summarize briefly below.
+
+TODO(apeterson91): Add summary of Basu's elephant and lessons learned.
+
+### Selecting Auxiliary Variables for Non-Response
+
+All the methods discussed thus far this chapter can be used to reduce the bias
+from missing data, specifically what Lumley calls *unit non-response*. The 
+phenomenon when the sampled unit cannot be measured, for example a person 
+sampled for a telephone interview does not pick up the phone.
+
+TODO(apeterson91): finish this
+
+#### Direct Standardization 
+
+####  Standard error estimation
+
+## Questions
+
+1.
+
+2.
+
+3.
+
+4.
+
+5.
 
 # Chapter 8: Two-Phase Sampling
 
