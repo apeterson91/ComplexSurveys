@@ -4053,6 +4053,122 @@ coefficient of variation, the ratio of the standard deviation to the mean.
 
 # Chapter 6: Categorical Data Regression
 
+Chapter 6 covers regression models for discrete outcome data --- binary or 
+categorical data. Though the `survey` package also handles poisson and
+binomial regression neither of these are covered in this chapter.
+
+
+## Logistic Regression
+
+Lumley gives a brief overview of logistic regression which is roughly equivalent
+to what can be found on 
+[wikipedia](https://en.wikipedia.org/wiki/Logistic_regression), so I won't
+reiterate his points here. The main take home is that while the interpretation
+of the coefficients change from a linear association to an odds ratio 
+association the only change to `svyglm()` is adding the `family=quasibinomial()`
+option.
+
+
+### Example: Internet use in Scotland
+
+To demonstrate how to analyze binary data, Lumley uses the Scottish Household
+Survey data, examining internet use amongst the nation's populace.
+
+```{r 6_scotland_example_eda, fig.height=8, fig.width=12}
+load("Data/SHS/shs.rda") # Lumley's website data
+par(mfrow = c(2, 1))
+bys <- svyby(~intuse, ~age + sex, design = shs, svymean) 
+plot(svysmooth(intuse ~ age, design = subset(shs, sex == "male" & !is.na(age)),
+               bandwidth = 5), ylim = c(0, 0.8), ylab = "% Using Internet",
+     xlab = "Age")
+lines(svysmooth(intuse ~ age,
+                design = subset(shs, sex == "female" & !is.na(age)),
+                bandwidth = 5), lwd = 2, lty = 3)
+points(bys$age, bys$intuse, pch =ifelse(bys$sex == "male", 19, 1))
+legend("topright", pch = c(19, 1), lty = c(1, 3), lwd = c(1, 2), 
+       legend = c("Male", "Female"), bty = "n")
+byinc <- svyby(~intuse, ~sex + groupinc, design = shs, svymean)
+barplot(byinc, xlab = "Income", ylab = "% Using Internet")
+```
+
+Since binary data can't be easily visualized across a continuous variable
+very easily, the plots above use both smoothing and binning --- computing
+the proportion point estimate within some range of age --- to understand
+how internet use changes across these continuous dimensions.
+
+We can see in the plot that internet use is lower amongst the older respondents
+in the survey and men ten to use the internet more then women, except perhaps 
+the very youngest. My phrasing here is intentional, to demonstrate that
+the phenomenon we're observing is likely a *cohort effect* since, as Lumley 
+notes, its likely that born before the arrival of the internet are less likely
+to use it.
+
+We see this same pattern in the boxplot showing internet use across income;
+men using internet more than women. We also see that those with higher incomes 
+tend to use the internet more than those with lower incomes. In contrast
+to the cohort effect seen above, Lumley suggests that income may be more of
+a real effect, and those who start earning more may be more likely to use the
+internet.
+
+Lumley then fits a series of models to quantify the relationships we're seeing 
+in the plots formally. I'll summarize these briefly here and fit them below.
+
+* Model 1 estimates the log odds of internet as a linear 
+(on the log odds scale) function of age, sex and their interaction.
+
+* Model 2 is the same as Model 1 except with two slopes for those younger and
+older than age 35, respectively --- a low dimensional way to account for the 
+nonlinear shape we observed previously.
+
+* Model 3 is the same as Model 2 but adds an additional fixed effect term for 
+income.
+
+* Model 4 now adds an interaction between income and sex to account for the 
+differences.
+
+Lumley examines the output of all the models and for models 2 and 3 examines
+what the two age-slopes for the reference group (women) is by using 
+`svycontrast()`.
+
+Lumley doesn't go too much farther beyond identifying positive or negative 
+associations for the different parameters, so I'll refrain from offering too
+
+```{r 6_scotland_example_models}
+m <- svyglm(intuse ~ I(age - 18) * sex, design = shs, family = quasibinomial())
+
+m2 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35))*sex, design = shs, 
+             family = quasibinomial())
+summary(m)
+```
+
+
+```{r 6_scotland_example_model2_output}
+summary(m2)
+```
+
+```{r 6_scotland_example_model2_contrast}
+svycontrast(m2, quote(`pmin(age, 35)` + `pmin(age, 35):sexfemale`))
+```
+
+
+```{r 6_scotland_example_model2_contrast_test}
+svycontrast(m2, quote(`pmax(age, 35)` + `pmax(age, 35):sexfemale`))
+```
+
+
+```{r 6_scotland_example_model_3}
+shs <- update(shs, income = relevel(groupinc, ref = "under 10K"))
+m3 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35)) * sex + income,
+             design = shs, family = quasibinomial())
+summary(m3)
+```
+
+
+```{r 6_scotland_example_model_4}
+m4 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35))*sex + income*sex, 
+             design = shs, family = quasibinomial())
+regTermTest(m4, ~income:sex)
+```
 
 
 # Chapter 7: Post-Stratification, Raking, and Calibration
