@@ -3260,13 +3260,12 @@ r <- svyratio(~api.stu, ~enroll, strat_design)
 predict(r, total = sum(apipop$enroll, na.rm = TRUE))
 ```
 
-Lumley uses this as a jumping off point to discuss linear regression, since,
-
+Lumley uses this as a jumping off point to discuss linear regression since 
 one can imagine the relationship between the number of students taking the API
 test as being roughly proportional to the number of students enrolled at the
 schools; $E[tests_i] = \alpha \times \text{enrollment}_i + \epsilon_i$ where
 $E[\epsilon] = 0$ (note that this is an assumption about the moment of the error
-distribution and not the shape itself).
+distribution and not the shape of the error distribution itself).
 
 ## Linear Regression
 
@@ -4102,6 +4101,8 @@ $$
 
 so that the unweighted sample estimating equations are unbiased.
 
+TODO(apeterson91)
+
 5.8 A rough approximation to the loss of efficiency from unnecessarily using
 weights can be constructed by considering the variance of the residuals in 
 weighted and unweighted estimation. Assume as an approximation that the 
@@ -4112,15 +4113,19 @@ $$
 V[\sum_{i=1}^{n} w_ir_i] = E[w^2] V[r] + V[w]E[r^2]
 $$
 
+TODO(apeterson91)
+
 * Now assume that the mean of the residuals is zero, and show that the 
 relative efficiency of the unweighted estimate is $1 + cv(w)$ where $cv$ is the
 coefficient of variation, the ratio of the standard deviation to the mean.
 
+TODO(apeterson91)
+
 # Chapter 6: Categorical Data Regression
 
 Chapter 6 covers regression models for discrete outcome data --- binary or 
-categorical data. Though the `survey` package also handles poisson and
-binomial regression neither of these are covered in this chapter.
+categorical data. The `survey` package also handles poisson and
+binomial regression though neither of these are covered in this chapter.
 
 
 ## Logistic Regression
@@ -4130,8 +4135,8 @@ to what can be found on
 [wikipedia](https://en.wikipedia.org/wiki/Logistic_regression), so I won't
 reiterate his points here. The main take home is that while the interpretation
 of the coefficients change from a linear association to an odds ratio 
-association the only change to `svyglm()` is adding the `family=quasibinomial()`
-option.
+association the only change to `svyglm()` is adding the 
+`family = quasibinomial()` option.
 
 
 ### Example: Internet use in Scotland
@@ -4193,10 +4198,11 @@ differences.
   
 Lumley examines the output of all the models and for models 2 and 3 examines
 what the two age-slopes for the reference group (women) is by using 
-`svycontrast()`.
+`svycontrast()`. Similarly with model 4, Lumley tests whether the 5 additional
+parameters  added as the result of the income / sex interaction  lead to better
+model fit. As we can see below, they do. 
 
-Lumley doesn't go too much farther beyond identifying positive or negative 
-associations for the different parameters, so I'll refrain from offering too
+
 
 ```{r 6_scotland_example_models}
 m <- svyglm(intuse ~ I(age - 18) * sex, design = shs, family = quasibinomial())
@@ -4235,6 +4241,15 @@ m4 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35))*sex + income*sex,
 regTermTest(m4, ~income:sex)
 ```
 
+
+Double check Lumley's assertions made on linear vs. logistic regression here.
+
+### Relative Risk Regression
+
+Logistic regression gets its name from the "link" function that determines 
+the scale on which outcome mean is modeled and estimated. For a logistic
+function the link is the "logit" function, which models the log odds. Other
+link functions are also possible.
 
 # Chapter 7: Post-Stratification, Raking, and Calibration
 
