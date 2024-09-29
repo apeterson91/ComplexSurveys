@@ -4286,9 +4286,16 @@ summary(rr4)
 
 ### Ordinal Regression
 
+The logit function introduced in the first section can be extended for use
+from binomial outcome data to categorical -- typically ordinal, or ordered
+categorical data. Unfortunately, the data that Lumley uses for this section is
+not available so I'll skip any notes on this, noting that the model 
+interpretation for logit ordinal regression is the same as for a typical
+iid logit ordinal model.
 
 ```{r prop_odds, eval = FALSE}
-## Need to find data
+## Data isn't available on lumley's website - or at least the data that is
+# there associated with "nhanes3" does not contain the variables below.
 dhanes <- svydesign(
   id = ~SDPPSU6, strat = ~SDPSTRA6,
   weight = ~WTPFHX6,
@@ -4308,12 +4315,122 @@ dhanes <- update(dhanes,
 model0 <- svyolr(diab ~ cadmium + creatine, design = dhanes)
 ```
 
+### Other cumulative Link models
+
+In this subsection Lumley discusses the log-log link function. The log log,
+probit, and `cauchit` or inverse cauchy link function are all supported by the
+`svyolr` function  and are collectively referred to as `cumulative link models`.
+
+## Loglinear Models
+
+Lumley introduces loglinear models in the context of the chi-square tests 
+(via `svychisq()`) introduced previously testing association between count 
+variables. These functions test a similar hypothesis using different methods and
+I'd suggest looking at the function documentation closely to determine if
+choosing between the two would matter in a particular circumstance.
+
+```{r loglinear_demo}
+droplevels <- function(f) as.factor(as.character(f))
+chis <- update(chis, smoking = droplevels(smoking), ins = droplevels(ins))
+null <- svyloglin(~smoking + ins, chis)
+# Dot below includes all previous variables
+saturated <- update(null, ~.+smoking:ins)
+anova(null, saturated)
+```
+
+The anova output above shows two p-values  according to two test statistics, 
+one the deviance and the other the score. Again, the difference here is quite
+"in the weeds" of how test statistic distributions are computed so I'd suggest
+consulting [@dobson2018introduction] and/or the function documentation.
+
+```{r loglinear_demo_part2}
+svychisq(~smoking + ins, chis)
+```
+
+```{r loglinear_demo_part3}
+pf(130.1143, 1.992, 157.338, lower.tail = FALSE)
+```
+
+```{r loglinear_demo_part4}
+svychisq(~smoking + ins, chis, statistic = "Chisq")
+```
+
+```{r loglinear_demo_part5}
+summary(null)
+```
+
+```{r loglinear_demo_part6}
+summary(saturated)
+```
+
+```{r loglinear_demo_part7}
+model.matrix(saturated)
+```
+
+### Choosing Models
+
+Lumley explores model selection beyond just statistical testing by discussing 
+graphical and hierarchical loglinear models. My sense is that the discussion
+here is not complete and I'd encourage any reader here to consult the 
+references he points to for further reading on the topic.
+
+**Example: neck and back pain in NHIS**
+
+I couldn't find the data associated with Lumley's example on his website
+or from a cursory Google search for NHIS data. Furthermore, I found it 
+difficult to parse some of Lumley's words here. For example, for those reading 
+the book, the two graphical models listed in Figure 6.11 look identical to me 
+when the text states that the graphics are supposed to correspond to two 
+different models.
+
+### Linear Association Models
+
+The log linear models can be used to test linear association of ordered 
+categorical variables by coding the variables with ordered numbers and then
+running the loglinear tests discussed previously. Lumley demonstrates with the
+Scottish Household Survey data.
+
+```{r loglinear_association_shs_part1}
+shs <- update(shs, income = ifelse(groupinc == "missing", NA, groupinc))
+null <- svyloglin(~rc5 + income, shs)
+saturated <- update(null, ~.^2)
+anova(null, saturated)
+```
+
+
+```{r loglinear_association_shs_part2}
+lin <- update(null, ~. + as.numeric(rc5):as.numeric(income))
+anova(null, lin)
+```
+
+
+```{r loglinear_association_shs_part3}
+anova(lin, saturated)
+```
+
+
 ## Questions
 
 1. Using the same data as in Section 5.2.4, define hypertension as systolic 
 blood pressure greater than 140 mm Hg or diastolic blood pressure greater than
 90 mmHg. Fit logistic regression models to investigate the association between
 dietary sodium and potassium and hypertension.
+
+```{r q6_1}
+des <- svydesign(
+  id = ~SDMVPSU, strat = ~SDMVSTRA, weights = ~fouryearwt,
+  nest = TRUE, data = subset(nhanes, !is.na(WTDRD1))
+)
+
+des <- update(des, sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000,
+              hypertension = (BPXSAR > 140 | BPXDAR > 90) * 1)
+summary(svyglm(hypertension ~ sodium*potassium, design = des))
+```
+
+We see sodium intake is negatively associated with hypertension while
+potassium is positively associated. Because we're not adjusting for age like we
+saw previously, the sodium intake coefficient is biased up from its adjusted
+rate.
 
 2. This exercise uses the WA State Crime data for 2004 as the population. The
 data consists of crime rates and population size for the police districts 
@@ -4324,6 +4441,10 @@ county.
  data from the sampled counties. Estimate the total number of murders and 
  burglaries in the state.
  
+```{r q6_2a}
+wa_crime_df
+```
+ 
  * Fit a poisson regression (`family=quasipoisson`) to model the relationship
  between number of murders and population. Poisson regression fits a linear
  model to the logarithm of the mean of the outcome variable. If the murder rate
@@ -4331,14 +4452,24 @@ county.
  the logarithm of population, and its coefficient would be 1.0. Is this 
  supported by the data?
  
+```{r q6_2b}
+```
+ 
  * Predict the total number of murders in the statte using the Poisson 
  regression model. Compare to a ratio estimator using population as the 
  auxiliary variable.
+ 
+```{r q6_2c}
+```
+ 
  
  * Take simple random samples of five police districts from King County and five
  counties from the rest of the state. Fit a Poisson regression model with 
  population and stratum (King County vs elsewhere) as predictors. Predict the
  total number of murders in the state.
+ 
+```{r q6_2d}
+```
  
 3. The variable MISEFFRT asks "How often in the past 30 days did you feel that 
 everything was an effort?", on a 1-5 scale with 1 meaning "All" and 5 meaning 
@@ -4350,6 +4481,9 @@ sin(IMONTH * 0.5236), which describe smooth anual cycles and fitting:
  * A linear regresion model with outcome MISEFFRT
  * What further modeling could you do to investigate whether sunlight intensity 
    was related to this seasonal variation.
+   
+It isn't clear to what dataset Lumley is referring to here... so I'll leave
+this question unanswered.
    
 4. Using the California Health Interview Study 2005 data,
 
@@ -4544,7 +4678,7 @@ Lumley identifies two ways to understand post-stratification:
 1. Post-stratification makes small changes to the sampling weights such that the 
 estimated totals match the population totals.
 
-2. Post-stratification is a rgression estimator, where each post-stratum is 
+2. Post-stratification is a regression estimator, where each post-stratum is 
 an indicator in a regression model.
 
 An extension of the first view leads to calibration estimators while the 
@@ -4562,7 +4696,7 @@ $$
 \hat{T}_{reg} = \sum_{i=1}^N X_i\hat{\beta}
 $$
 
-From this starting point, Lumley descibres that calibration follows a similar 
+From this starting point, Lumley describes that calibration follows a similar 
 form, with the unknown parameter $\hat{\beta}$ know a function of the 
 calibration weights $g_i$ and original sampling weights $\pi_i$ defined in such
 a way that the population total of $X$ is equal to the estimated total of $X$.
@@ -4733,6 +4867,18 @@ $\pi_1$ and $\pi_{2|1}$ which describe the probability of an entity being
 sampled in phase one and the the probability of a phase being sampled in stage
 two, conditional on being sampled in phase one.
 
+
+```{r nwts_2phase_demo}
+nwts <- nwtsco
+set.seed(1337)
+subsample <- with(nwts, c(which(relaps == 1 | instit == 1),
+                          sample(which(relaps == 0 & instit == 0), 499)))
+nwts$in.subsample <- (1:nrow(nwts)) %in% subsample
+nwts_design <- twophase(id = list(~1, ~1), subset = ~in.subsample,
+                        strata = list(NULL, ~interaction(instit, relaps)), 
+                        data = nwts)
+nwts_design
+```
 # Chapter 9: Missing Data
 
 # Chapter 10: Causal Inference
