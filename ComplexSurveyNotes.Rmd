@@ -1764,7 +1764,7 @@ the 2007 Behavioral Risk Factor Surveillance System dataset, we see design
 effects that reflect the geographic variability across the blocks of telephone
 numbers that were sampled for the survey.
 
-```{r BRFSS}
+```{r BRFSS_read_in}
 brfss <- svydesign(
   id = ~X_PSU, strata = ~X_STATE, weight = ~X_FINALWT,
   data = "brfss", dbtype = "SQLite",
@@ -1773,7 +1773,7 @@ brfss <- svydesign(
 brfss
 ```
 
-```{r}
+```{r, brfss_geo_effects}
 food_labels <- c("Yes Veg", "No Veg")
 chol_labels <- c("within 5 years", ">5 years", "never")
 svymean(
@@ -1902,7 +1902,7 @@ bpdf <- merge(ddf, bpdf, by = "SEQN", all = FALSE) %>%
 bpdf_design <- bpdf %>%
   select(
     sys_over_140, dia_over_90, hbp, WTMEC2YR, SDMVPSU, SDMVSTRA,
-    age_group, sex, RIDAGEYR, BPXSAR, BPXDAR, RIAGENDR, RIDAGEMN
+    age_group, sex, RIDAGEYR, BPXSAR, BPXDAR, RIAGENDR, RIDAGEMN,
   ) %>%
   as_survey_design(
     weights = WTMEC2YR,
@@ -2158,6 +2158,7 @@ burglaries in the state.
 wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   filter(Year == "2004", Population > 0) %>%
   mutate(
+    murder = `Murder Total`,
     murder_and_crime = `Murder Total` + `Burglary Total`,
     violent_crime = `Violent Crime Total`,
     property_crime = `Property Crime Total`,
@@ -2169,9 +2170,8 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   mutate(num_agencies = n_distinct(Agency)) %>%
   ungroup() %>%
   select(
-    County, Agency, Population, murder_and_crime,
-    violent_crime, property_crime,
-    num_counties, num_agencies
+    County, Agency, Population, murder_and_crime, murder, violent_crime,
+    property_crime, num_counties, num_agencies
   )
 
 true_count <- sum(wa_crime_df$murder_and_crime)
@@ -4318,12 +4318,12 @@ model0 <- svyolr(diab ~ cadmium + creatine, design = dhanes)
 ### Other cumulative Link models
 
 In this subsection Lumley discusses the log-log link function. The log log,
-probit, and `cauchit` or inverse cauchy link function are all supported by the
+probit, and `cauchit` or inverse Cauchy link function are all supported by the
 `svyolr` function  and are collectively referred to as `cumulative link models`.
 
 ## Loglinear Models
 
-Lumley introduces loglinear models in the context of the chi-square tests 
+Lumley introduces log linear models in the context of the chi-square tests 
 (via `svychisq()`) introduced previously testing association between count 
 variables. These functions test a similar hypothesis using different methods and
 I'd suggest looking at the function documentation closely to determine if
@@ -4341,7 +4341,8 @@ anova(null, saturated)
 The anova output above shows two p-values  according to two test statistics, 
 one the deviance and the other the score. Again, the difference here is quite
 "in the weeds" of how test statistic distributions are computed so I'd suggest
-consulting [@dobson2018introduction] and/or the function documentation.
+consulting a general reference on generalized linear models like 
+[@dobson2018introduction] and/or the function documentation.
 
 ```{r loglinear_demo_part2}
 svychisq(~smoking + ins, chis)
@@ -4390,6 +4391,20 @@ categorical variables by coding the variables with ordered numbers and then
 running the loglinear tests discussed previously. Lumley demonstrates with the
 Scottish Household Survey data.
 
+Lumley first starts by looking at internet use, now an ordinal categorical 
+variable, `rc5` across income levels as before. Again, the similarity to
+the chi-square model is obvious, as we're looking at models with fixed effects
+only --- a "null" model --- and comparing it to a "saturated" model --- one with
+interaction effects. The `anova()` call below, tests whether the additional
+parameters estimated by the interaction model provide a greater model fit than
+the model with the fixed effects alone. The idea being that if it does,
+then there's evidence to support the hypothesis that internet use varies across
+income levels, and since we're measuring internet use on an ordinal scale we
+have evidence that more income corresponds to more internet use. Note that
+below, only the models fit with the `as.numeric()` pieces are testing linear
+association on the ordinal scale, while the others are a simple categorical
+test.
+
 ```{r loglinear_association_shs_part1}
 shs <- update(shs, income = ifelse(groupinc == "missing", NA, groupinc))
 null <- svyloglin(~rc5 + income, shs)
@@ -4397,17 +4412,71 @@ saturated <- update(null, ~.^2)
 anova(null, saturated)
 ```
 
+For the first model fit, we have a low p-value, so we reject the null model 
+which make sense substantively. We've already seen that income is associated
+with internet use in the previous analysis.
+
 
 ```{r loglinear_association_shs_part2}
 lin <- update(null, ~. + as.numeric(rc5):as.numeric(income))
 anova(null, lin)
 ```
+Now the model is updated with the ordinal categorical variable of internet
+use and income, again we have a significant result.
 
 
 ```{r loglinear_association_shs_part3}
 anova(lin, saturated)
 ```
+Now we compare the ordinal model to the categorical, non-ordered model. 
+It would make sense that the ordinal model provides a better fit than the 
+categorical, and although that's what we see in the book it isn't what we
+see when I run the code, even with the same Deviance and Score test 
+statistics... I suspect this is a bug. The survey R package isn't hosted on
+github but I'll try to raise an issue with Lumley via email.
 
+
+```{r loglinear_association_shs_part4}
+shs <- update(shs, agegp = cut(age, c(20, 40, 60, 100)))
+null <- svyloglin(~agegp + rc5, shs)
+sat <- update(null, ~.^2) 
+lin <- update(null, ~. + as.numeric(rc5): as.numeric(agegp))
+anova(null, lin)
+```
+
+Now we look at the association of internet use with age tested via the 
+log linear models. Again, we find that the ordinal interaction model has 
+a better fit to the data according to the Deviance and Score tests.
+
+
+```{r loglinear_association_shs_part5}
+anova(lin, sat)
+```
+
+Looking at the ordinal vs. categorical model comparison we again see a 
+discrepancy between my results and Lumleys, with mine suggesting that the
+ordinal model does not provide a better fit than the categorical model...
+
+
+```{r loglinear_association_shs_par6}
+# code for producing Table 6.1
+null <- svyloglin(~agegp + income + rc5, shs)
+m1 <- update(null, ~. + as.numeric(agegp):as.numeric(rc5))
+m2 <- update(m1, ~. + agegp:income)
+m3 <- update(m2, ~. + as.numeric(income):as.numeric(rc5))
+m4 <- update(m2, ~. + income:rc5)
+full <- update(null, ~.^2)
+```
+
+As a final step in this demonstration, Lumley then looks at each possible
+model that has both interactions, noting that an interaction between age
+group and income isn't possible because of sparsity of data amongst some
+income / age group categories.
+
+Looking at Table 6.1 in the book, Lumley examines the ratio of deviance to 
+degrees of freedom to provide a heuristic of determining whether the full
+model fits well. I'm not fully convinced of his discussion here and there,
+again, appears to be an error in his table.
 
 ## Questions
 
@@ -4424,7 +4493,7 @@ des <- svydesign(
 
 des <- update(des, sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000,
               hypertension = (BPXSAR > 140 | BPXDAR > 90) * 1)
-summary(svyglm(hypertension ~ sodium*potassium, design = des))
+summary(svyglm(hypertension ~ sodium + potassium, design = des))
 ```
 
 We see sodium intake is negatively associated with hypertension while
@@ -4442,7 +4511,19 @@ county.
  burglaries in the state.
  
 ```{r q6_2a}
-wa_crime_df
+county_sample <- wa_crime_df %>% 
+  distinct(County) %>% 
+  slice_sample(n = 10) %>% 
+  pull(County)
+
+wa_crime_df %>% 
+  filter(County %in% county_sample) %>% 
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  ) %>%
+  summarize(total = survey_total(murder_and_crime)) %>%
+  mutate(Q = "a")
 ```
  
  * Fit a poisson regression (`family=quasipoisson`) to model the relationship
@@ -4453,23 +4534,97 @@ wa_crime_df
  supported by the data?
  
 ```{r q6_2b}
+srs_design <- wa_crime_df %>% 
+  filter(County %in% county_sample) %>% 
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  ) 
+
+poisson_fit <- svyglm(murder ~ I(log(Population)), family = quasipoisson, 
+                      design = srs_design)
+summary(poisson_fit)
 ```
+
+Yes. We see that the estimate is 1.13 which is roughly 1 and within the 
+standard error. Furthermore, the t-test shows that there is evidence this 
+estimate is not 0 at $\alpha = 0.05$.
  
- * Predict the total number of murders in the statte using the Poisson 
+ * Predict the total number of murders in the state using the Poisson 
  regression model. Compare to a ratio estimator using population as the 
  auxiliary variable.
  
 ```{r q6_2c}
+true_murder_count <- sum(wa_crime_df$murder)
+total_population <- sum(wa_crime_df$Population)
+# doesn't work
+# predict(poisson_fit, newdata = wa_crime_df, type = "response",
+#        total = sum(wa_crime_df$Population))
+# Works - for mean estimate, care needed for summing variance
+sum(predict(poisson_fit, newdata = wa_crime_df, type = "response"))
 ```
- 
- 
+
+
+```{r q6_2c_ratio_estimator}
+predict(svyratio(~murder, ~Population,
+                 design = srs_design),
+        total = sum(wa_crime_df$Population))
+```
+
+
+We see that while both estimates are reasonably close to the true state 2004 
+murder count of `r true_murder_count`, the ratio estimator offers a readily 
+available standard error while its not clear how to extract the same estimate
+from the `svyglm` output. Note that the same code arguments used extract totals
+in Lumley's election example does not appear to work here...
+
+
  * Take simple random samples of five police districts from King County and five
  counties from the rest of the state. Fit a Poisson regression model with 
  population and stratum (King County vs elsewhere) as predictors. Predict the
  total number of murders in the state.
  
 ```{r q6_2d}
+agency_sample <- wa_crime_df %>% 
+  filter(County == "king") %>% 
+  distinct(Agency) %>% 
+  slice_sample(n = 10) %>% 
+  pull(Agency)
+
+non_king_county_sample <- wa_crime_df %>% 
+  filter(County != "king") %>% 
+  distinct(County) %>% 
+  slice_sample(n = 10) %>% 
+  pull(County)
+
+county_list <- unique(wa_crime_df$County)
+
+strata_design <- wa_crime_df %>% 
+  filter(County %in% non_king_county_sample | Agency %in% agency_sample) %>% 
+  mutate(
+    strata_label = if_else(County == "king", "strata 1", "strata 2"),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1)
+    ) %>% 
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  ) 
+  
+  
+poisson_fit <- svyglm(murder ~ I(log(Population)) + strata_label,
+                      design = strata_design, 
+                      family = quasipoisson)
+# doesn't produce appropriate output
+# predict(poisson_fit, total = total_population)
+sum(predict(poisson_fit, 
+            newdata = wa_crime_df %>% mutate(strata_label = if_else(County == "king", "strata 1", "strata 2")),
+            type = "response"))
 ```
+This estimate appears to again, make sense though we have no standard error
+estimate readily available to compare with the previous. One would guess that
+it would be more precise, given extra information that comes from including
+the King County agencies.
  
 3. The variable MISEFFRT asks "How often in the past 30 days did you feel that 
 everything was an effort?", on a 1-5 scale with 1 meaning "All" and 5 meaning 
@@ -4491,9 +4646,23 @@ this question unanswered.
  of having health insurance (`ins`) and household annual income (`ak22_p`). 
  Important potential confounders include age (`srage_p`), sex (`srsex`) and 
  race (`racecen`) and interactions may also be important.
+ 
+```{r q6_4a}
+fit <- svyglm(I((ins==1)*1) ~ ak22_p + srage_p + srsex,
+              design = chis,
+              family = quasibinomial)
+summary(fit)
+```
+
  * What would be the impact on the interpretation of the income coefficient of
  adding a variable to the model indicating whether an employer provided
  health insurance?
+ 
+Presumably income is correlate with employee offered healthcare insurance, 
+though I don't know this for a fact. If this were the case then we'd see that
+the effect of the income coefficient would be attenuated (move towards zero)
+since its effect would now be more precisely captured by the employee
+offered health care measurement.
  
 5. Using the California Health Interview Study 2005 data, fit a relative risk
 regression model to the relationship between the probability of having health
@@ -4501,7 +4670,25 @@ insurance (`ins`) and household annual income (`ak22_p`), age (`srage_p`),
 sex (`srsex`) and race (`racecen`) . Compare the coefficients to those from a
 logistic regression.
 
-6. Using the same data as in Section 2.5.4, create an ordinal blood pressure
+```{r q6_5a, eval = FALSE}
+fit <- svyglm(I((ins==1)*1) ~ ak22_p,
+              design = chis,
+              family = quasibinomial(link="log"), 
+              start = c(-.5, 0),
+              control = list(maxit = 150))
+summary(fit)
+```
+
+Despite trying several different starting values, maxiterations, and model
+specifications, I wasn't able to fit a model as specified without getting
+warning messages or errors. In general if the model *can* be fit, the 
+exponentiated intercept represents the adjusted probability of the event
+occuring --- in this case having health insurance --- and each subsequent
+exponentiated coefficient represents the increase in probability, or relative
+risk of the event occuring, conditional on a one unit change in value of the
+covariate.
+
+6. Using the same data as in Section 5.2.4, create an ordinal blood pressure
 variable based on systolic and diastolic pressure with categories "normal" 
 (systolic < 120 and diastolic < 80), "prehypertension" (systolic < 140,
 diastolic < 90), "hypertension stage 1" (systolic < 160, diastolic < 100),
@@ -4509,14 +4696,59 @@ and "hypertension stage 2" ( systolic at least 160 or diastolic at least 100).
 Fit proportional odds regression models to investigate the association between 
 dietary sodium and potassium and hypertension.
 
+```{r q6_6}
+nhanes <- nhanes %>% 
+  mutate(
+    ordinal_high_bp = factor(dplyr::case_when(
+      BPXSAR < 120 & BPXDAR < 80 ~ "Normal",
+      (BPXSAR < 140 & BPXSAR >= 120) & (BPXDAR >= 80 & BPXDAR < 90) ~ 
+        "PreHypertension",
+      (BPXSAR >= 140 & BPXSAR < 160) & (BPXDAR >=90 & BPXDAR < 100) ~ 
+        "Hypertension Stage 1",
+      BPXSAR >= 160 & BPXDAR >= 100  ~ "Hypertension Stage 1"
+    ), levels = c("Normal", "PreHypertension", "Hypertension Stage 1",
+                  "Hypertension Stage 2"))
+  )
+
+des <- svydesign(
+  id = ~SDMVPSU, strat = ~SDMVSTRA, weights = ~fouryearwt,
+  nest = TRUE, data = subset(nhanes, !is.na(WTDRD1))
+)
+
+fit <- svyolr(ordinal_high_bp ~ sodium + potassium, design = des)
+summary(fit)
+```
+
+Because many of the individuals have blood pressure values that aren't covered
+by the categories Lumley listed, we lose ~9000 observations leading to 
+a decrease in the precision of our estimates. Notably, the sodium coefficient
+is no now significant (|t-value| < 2). Because the missignness here is 
+self-caused I wouldn't draw any strong conclusions from this model.
+
 7. Using data for Florida (`X_STATE = 12`) from the 2007 BRFSS, fit a loglinear
 model to associations between the following risk factors and behaviors:
 perform vigorous physical activity (`VIGPACT`), eat five or more servings of
-fruit or vegetables per day (`X_FV5RV`), binge drinking of alcohol 
+fruit or vegetables per day (`X_FV5SRV`), binge drinking of alcohol 
 (`X_RFBING4`), ever had an HIV test (`HIVST5`), ever had Hepatitis B vaccine 
 (`HEPBVAC`), age group (`X_AGE_G`) and sex, `X_SEXG`. All except age group are
 binary. You will need to remove missing values, coded 7,8 or 9.
 
+```{r q6_7, eval = FALSE}
+brfss_sub <- subset(brfss, X_STATE == 12 & !any(VIGPACT %in% c(7,8,9)) &
+                      !any(X_FV5SRV %in% 7:9) & !any(X_RFBING4 %in% 7:9) &
+                      !any(HIVTST5 %in% 7:9) & !any(HEPBVAC %in% 7:9) & 
+                      !any(X_AGE_G %in% 7:9) & !any(X_SEXG_ %in% 7:9))
+loglin_fit <- svyloglin(~VIGPACT + X_FV5SRV + X_RFBING4 + HIVTST5 + HEPBVAC + 
+                          X_AGE_G + X_SEXG_, design = brfss_sub)
+summary(loglin_fit)
+```
+
+Despite all the subsetting I received the following error message when trying
+to fit the model as suggested. I'm guessing the dimensionality of the 
+model matrix is quite large and the underlying functions don't use a sparse
+representation...
+
+`Error: vector memory limit of 50.0 Gb reached, see mem.maxVSize()`
 
 # Chapter 7: Post-Stratification, Raking, and Calibration
 
@@ -4748,7 +4980,6 @@ svymean(~HHINC, subset(frs.cal, DEPCHLDH > 0 & ADULTH == 1))
 ```
 
 #### Comparing calibration methods 
-
 
 ```{r calibration_comparison_setup}
 clus1 <- svydesign(id = ~dnum, weights = ~pw, data = apiclus1, fpc = ~fpc)
