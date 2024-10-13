@@ -4658,7 +4658,7 @@ summary(fit)
  adding a variable to the model indicating whether an employer provided
  health insurance?
  
-Presumably income is correlate with employee offered healthcare insurance, 
+Presumably income is correlated with employee offered healthcare insurance, 
 though I don't know this for a fact. If this were the case then we'd see that
 the effect of the income coefficient would be attenuated (move towards zero)
 since its effect would now be more precisely captured by the employee
@@ -4679,7 +4679,7 @@ fit <- svyglm(I((ins==1)*1) ~ ak22_p,
 summary(fit)
 ```
 
-Despite trying several different starting values, maxiterations, and model
+Despite trying several different starting values, "max iterations", and model
 specifications, I wasn't able to fit a model as specified without getting
 warning messages or errors. In general if the model *can* be fit, the 
 exponentiated intercept represents the adjusted probability of the event
@@ -5058,7 +5058,66 @@ poor use of auxiliary information can lead to unreasonable behavior of design-
 based inference. Lumley then goes on to show how calibrated weights could make
 this more efficient. I'll summarize briefly below.
 
-TODO(apeterson91): Add summary of Basu's elephant and lessons learned.
+Suppose a circus owner has 50 elephants and wants to estimate their 
+total weight. The catch? The owner only wants to use **one** of the elephants
+to construct the estimate.
+
+One could construct an unbiased point estimate by taking a randomly sampled
+elephant's weight and multiplying it by fifty. No estimate of the variance is
+available of course, because there's no way to get an estimate of the 
+variability in the elephants' weights.
+
+Alternatively, a **model** based approach could depend on some auxiliary variable.
+Suppose the circus owner knew one particular elephant named Sambo was about
+average weight when all the elephants were weighed some years ago. The proposed
+method here then would be to sample Sambo with 100% probability and multiply his
+weight by 50. Lumley notes that this can't be considered a valid **design** 
+based estimate because all the other elephants had 0% probability of being
+sampled.
+
+Basu then imagines a compromise design that conforms to the necessary
+conditions required for design based inference, but that produces a nonsensical
+estimate. If Sambo was sampled with high probility, say 99%, then the point
+estimate would be $\frac{100}{99} \times$ Sambo's weight if Sambo is sampled and
+5000 $\times$ the weight of any other elephant.
+
+Obviously, this is not a good estimate, though Lumley notes that it will
+fulfill the Horvitz Thompson Property of being unbiased when averaging over
+repeated sampling. The problem of course being in the extreme variability of
+the estimate.
+
+Lumley uses this scenario as an opportunity to discuss how to best use the 
+auxiliary information (Sambo's roughly average weight) in the context of setting
+up a design based estimator, arguing that the use of the information and the
+Horvitz Thompson Estimator are inappropriately used.
+
+#### Using auxiliary information in design
+
+The first point Lumley expands on is how to use auxiliary information. He argues
+that a stratified sample would be a better way to use information that Sambo 
+is roughly average --- splitting elephants according to whether they were 
+small, middle or large looking. 
+[Ranked Set Sampling](https://www.asc.ohio-state.edu/dean.9/papers/wolfe-ranked-set-sampling.pdf)
+is also called out as a strategy that might be more useful in this setting.
+
+#### Using Auxiliary Information in Analysis
+
+The bigger point Lumley wants to make is that it would've been better to use
+the population size information to calibrate the weights, i.e. estimate the
+population total with weights $\frac{g_i}{\pi_i} := 50$, so that
+the estimate would be, as in the first approach, 50 times a sampled elephant's 
+weight.
+
+Lumley also lays out two ratio and difference calibration based models that
+use the previous elephant's weight as a way to more precisely estimate the 
+change in elephants weight since last weighing as as a generalization to the
+total. 
+
+
+All-in-all, Lumley's point is to highlight how auxiliary information can be
+more efficiently utilized and to demonstrate how the simple example fails to
+realize the full power of a design based approach.
+
 
 ### Selecting Auxiliary Variables for Non-Response
 
@@ -5067,23 +5126,107 @@ from missing data, specifically what Lumley calls *unit non-response*. The
 phenomenon when the sampled unit cannot be measured, for example a person 
 sampled for a telephone interview does not pick up the phone.
 
-TODO(apeterson91): finish this
+Missing data is an interesting research topic in its own right with standard
+fundamentals describing the different 
+[mechanisms]((https://en.wikipedia.org/wiki/Missing_data#Types) or models of 
+how missing data may emerge. Lumley's discussion of how auxiliary variables
+for non-response can be selected is equivalent to the missing data mechanism
+known as "Missing at Random", which implies that the fact that a
+measurement is missing is independent of the measurement itself, conditional
+on the other variables measured.
+
+In the design-based view, this can mean one of several things, though Lumley
+focuses mainly on the strata in post-stratification. That is, the 
+"other variables measured" refers to the strata information. 
+
+Lumley uses a telephone survey to illustrate this concept. If non-response
+was higher for land line than cellphone users but within each group the 
+probability of responding was independent of the measure itself, then
+an analysis that combined these two groups together would be biased, but a 
+post-stratified analysis would not be, since it estimated the strata specific
+rates.
+
 
 #### Direct Standardization 
 
+Lumley identifies "Direct Standardization" as an application of 
+post-stratification to extrapolate an estimate in a different population than
+the sampled population, while adjusting for as many known confounders as
+possible. This is a bit like comparing regression predictions.
+
 ####  Standard error estimation
+
+Lumley makes a brief note here that the same approach for computing standard
+errors with complete data is used for incomplete data. Though, he makes 
+a note that "secondary analysis" of large-scale surveys is not completely 
+possible --- I'm not clear what he means here, if this is dependent on some
+sampling stage specific information or perhaps he is referring to "domain" or
+sub-population estimation.
+
+In any case, Lumley states that a conservative approach is used in this case
+when the calibration estimates are used --- again, I'm guessing he's referring 
+to the `survey` R package's implementation, though it isn't explicit. However,
+if replicate weights are available, then a full estimate is available.
 
 ## Questions
 
-1.
+1. Using the WA State Criem population, take a stratified random sample of five
+police districts from King County and five counties from the rest of the state.
 
-2.
+* a. Calibrate the sample using stratum and population as the auxiliary 
+variables. Estimate the number of murders and number of burglaries in the state 
+using the calibrated and uncalibrated sample.
 
-3.
+* b. Convert the original survey design object to use jacknife replicate weights.
+Calibrate the replicate-weight design using the same auxiliary variables and 
+estimate the number of burglaries and of murders in the state.
 
-4.
+* c. Calibrate the sample using the population and number of burgarlies in the
+previous year as auxiliary variables, and estimat the number of burglaries and 
+murders in the state.
 
-5.
+* d. Estimate the ratio of violent crimes to property crimes in the state, 
+using the uncalibrated sample and the sample calibrated on population and 
+number of burglaries.
+
+2. Write an R function that accepts a set of 50 elephant weights and simulates
+repeatedly choosing a single elephant and computing the Horvitz-Thompson and
+ratio estimators of the total weight, reporting the mean and variance over
+the repeated simulations. Explore the behavior for several sets of elephant 
+weights. Verify that the Horvitz-Thompson estimator is always unbiased, but 
+usually further from the truth than the ratio estimator.
+
+3. Write an R function taht accepts a set of 50 elephant weights and performs
+the ranked set sampling procedure on page 150 to choose three of them. By
+simulation, compare the bias and variance of the stimated total from ranked-set
+sample to estimated totals from a simple random sample of three elephants.
+
+4. Estimate the proportions of people in CA with normal weight, overweight and 
+obesity using the BRFSS 2007 data (X_STATE = 6, X_BMI4CAT = BMI). Post-stratify
+the CA data to have the same age and sex distribution as the data for FL 
+(X_STATE = 12) and compute the directly standardized estimates based on CA
+data to estimates form the data for FL to see if the differences in BMI 
+between the states are explained by differences in age distribution.
+
+5. Consider a categorical post-stratification variable with $K$ categories
+having as population counts $N_1, N_2,...N_K$. Suppose we are interested in 
+estimating the total of a variable $Y$.
+
+* a. Show that the post-stratified estimate is 
+$$
+\hat{T}_{ps} = \sum_{k=1}^{K} N_k \hat{\mu}_k,
+$$
+
+where $\hat{\mu}_k$ is the estimated mean of $Y$ in group $K$ before 
+post-stratification.
+
+* b. Show that the regression estimate from a model with indicator variables
+for each group is also 
+
+$$
+\hat{T}_{reg} = \sum_{k=1}^{K} N_k \hat{\mu}_k
+$$
+
 
 # Chapter 8: Two-Phase Sampling
 
