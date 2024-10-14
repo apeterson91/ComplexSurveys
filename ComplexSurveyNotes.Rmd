@@ -2161,6 +2161,7 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
     murder = `Murder Total`,
     murder_and_crime = `Murder Total` + `Burglary Total`,
     violent_crime = `Violent Crime Total`,
+    burglaries = `Burglary Total`,
     property_crime = `Property Crime Total`,
     state_pop = sum(Population),
     County = stringr::str_to_lower(County),
@@ -2171,7 +2172,7 @@ wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   ungroup() %>%
   select(
     County, Agency, Population, murder_and_crime, murder, violent_crime,
-    property_crime, num_counties, num_agencies
+    property_crime, burglaries, num_counties, num_agencies
   )
 
 true_count <- sum(wa_crime_df$murder_and_crime)
@@ -4271,11 +4272,13 @@ restrictive, estimation is more sensitive to the fitting algorithm's
 parameters starting values and 
 
 ```{r relative_risk}
-rr3 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35)) * sex + income, 
-              design = shs, family = quasibinomial(log),
-              start = c(-0.5, rep(0, 10)))
-rr4 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35)) * sex + income, 
-              design = shs, family = quasipoisson(log))
+rr3 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35)) * sex + income,
+  design = shs, family = quasibinomial(log),
+  start = c(-0.5, rep(0, 10))
+)
+rr4 <- svyglm(intuse ~ (pmin(age, 35) + pmax(age, 35)) * sex + income,
+  design = shs, family = quasipoisson(log)
+)
 summary(rr3)
 ```
 
@@ -4305,12 +4308,17 @@ dhanes <- svydesign(
   data = subset(nhanes3, !is.na(WTPFHX6))
 )
 dhanes <- update(dhanes, fpg = ifelse(phpfast >= 8 & gip < 8E3, gip, NA))
-dhanes <- update(dhanes, diab = cut(fpg, c(0, 110, 125, Inf)),
-                 diabi = cut(fpg, c(0, 100, 125, Inf)))
-dhanes <- update(dhanes, cadmium = ifelse(upd < 88880, udp, NA),
-                 creatinine = ifelse(urp < 88880, urp, NA))
-dhanes <- update(dhanes, 
-                 age = ifelse(hsaitmor > 1000, NA, hsaitmor / 12))
+dhanes <- update(dhanes,
+  diab = cut(fpg, c(0, 110, 125, Inf)),
+  diabi = cut(fpg, c(0, 100, 125, Inf))
+)
+dhanes <- update(dhanes,
+  cadmium = ifelse(upd < 88880, udp, NA),
+  creatinine = ifelse(urp < 88880, urp, NA)
+)
+dhanes <- update(dhanes,
+  age = ifelse(hsaitmor > 1000, NA, hsaitmor / 12)
+)
 
 model0 <- svyolr(diab ~ cadmium + creatine, design = dhanes)
 ```
@@ -4332,9 +4340,9 @@ choosing between the two would matter in a particular circumstance.
 ```{r loglinear_demo}
 droplevels <- function(f) as.factor(as.character(f))
 chis <- update(chis, smoking = droplevels(smoking), ins = droplevels(ins))
-null <- svyloglin(~smoking + ins, chis)
+null <- svyloglin(~ smoking + ins, chis)
 # Dot below includes all previous variables
-saturated <- update(null, ~.+smoking:ins)
+saturated <- update(null, ~ . + smoking:ins)
 anova(null, saturated)
 ```
 
@@ -4345,7 +4353,7 @@ consulting a general reference on generalized linear models like
 [@dobson2018introduction] and/or the function documentation.
 
 ```{r loglinear_demo_part2}
-svychisq(~smoking + ins, chis)
+svychisq(~ smoking + ins, chis)
 ```
 
 ```{r loglinear_demo_part3}
@@ -4353,7 +4361,7 @@ pf(130.1143, 1.992, 157.338, lower.tail = FALSE)
 ```
 
 ```{r loglinear_demo_part4}
-svychisq(~smoking + ins, chis, statistic = "Chisq")
+svychisq(~ smoking + ins, chis, statistic = "Chisq")
 ```
 
 ```{r loglinear_demo_part5}
@@ -4407,8 +4415,8 @@ test.
 
 ```{r loglinear_association_shs_part1}
 shs <- update(shs, income = ifelse(groupinc == "missing", NA, groupinc))
-null <- svyloglin(~rc5 + income, shs)
-saturated <- update(null, ~.^2)
+null <- svyloglin(~ rc5 + income, shs)
+saturated <- update(null, ~ .^2)
 anova(null, saturated)
 ```
 
@@ -4418,7 +4426,7 @@ with internet use in the previous analysis.
 
 
 ```{r loglinear_association_shs_part2}
-lin <- update(null, ~. + as.numeric(rc5):as.numeric(income))
+lin <- update(null, ~ . + as.numeric(rc5):as.numeric(income))
 anova(null, lin)
 ```
 Now the model is updated with the ordinal categorical variable of internet
@@ -4438,9 +4446,9 @@ github but I'll try to raise an issue with Lumley via email.
 
 ```{r loglinear_association_shs_part4}
 shs <- update(shs, agegp = cut(age, c(20, 40, 60, 100)))
-null <- svyloglin(~agegp + rc5, shs)
-sat <- update(null, ~.^2) 
-lin <- update(null, ~. + as.numeric(rc5): as.numeric(agegp))
+null <- svyloglin(~ agegp + rc5, shs)
+sat <- update(null, ~ .^2)
+lin <- update(null, ~ . + as.numeric(rc5):as.numeric(agegp))
 anova(null, lin)
 ```
 
@@ -4460,12 +4468,12 @@ ordinal model does not provide a better fit than the categorical model...
 
 ```{r loglinear_association_shs_par6}
 # code for producing Table 6.1
-null <- svyloglin(~agegp + income + rc5, shs)
-m1 <- update(null, ~. + as.numeric(agegp):as.numeric(rc5))
-m2 <- update(m1, ~. + agegp:income)
-m3 <- update(m2, ~. + as.numeric(income):as.numeric(rc5))
-m4 <- update(m2, ~. + income:rc5)
-full <- update(null, ~.^2)
+null <- svyloglin(~ agegp + income + rc5, shs)
+m1 <- update(null, ~ . + as.numeric(agegp):as.numeric(rc5))
+m2 <- update(m1, ~ . + agegp:income)
+m3 <- update(m2, ~ . + as.numeric(income):as.numeric(rc5))
+m4 <- update(m2, ~ . + income:rc5)
+full <- update(null, ~ .^2)
 ```
 
 As a final step in this demonstration, Lumley then looks at each possible
@@ -4491,8 +4499,10 @@ des <- svydesign(
   nest = TRUE, data = subset(nhanes, !is.na(WTDRD1))
 )
 
-des <- update(des, sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000,
-              hypertension = (BPXSAR > 140 | BPXDAR > 90) * 1)
+des <- update(des,
+  sodium = DR1TSODI / 1000, potassium = DR1TPOTA / 1000,
+  hypertension = (BPXSAR > 140 | BPXDAR > 90) * 1
+)
 summary(svyglm(hypertension ~ sodium + potassium, design = des))
 ```
 
@@ -4511,13 +4521,13 @@ county.
  burglaries in the state.
  
 ```{r q6_2a}
-county_sample <- wa_crime_df %>% 
-  distinct(County) %>% 
-  slice_sample(n = 10) %>% 
+county_sample <- wa_crime_df %>%
+  distinct(County) %>%
+  slice_sample(n = 10) %>%
   pull(County)
 
-wa_crime_df %>% 
-  filter(County %in% county_sample) %>% 
+wa_crime_df %>%
+  filter(County %in% county_sample) %>%
   as_survey_design(
     ids = c(County, Agency),
     fpc = c(num_counties, num_agencies)
@@ -4534,15 +4544,17 @@ wa_crime_df %>%
  supported by the data?
  
 ```{r q6_2b}
-srs_design <- wa_crime_df %>% 
-  filter(County %in% county_sample) %>% 
+srs_design <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
   as_survey_design(
     id = c(County, Agency),
     fpc = c(num_counties, num_agencies)
-  ) 
+  )
 
-poisson_fit <- svyglm(murder ~ I(log(Population)), family = quasipoisson, 
-                      design = srs_design)
+poisson_fit <- svyglm(murder ~ I(log(Population)),
+  family = quasipoisson,
+  design = srs_design
+)
 summary(poisson_fit)
 ```
 
@@ -4566,9 +4578,12 @@ sum(predict(poisson_fit, newdata = wa_crime_df, type = "response"))
 
 
 ```{r q6_2c_ratio_estimator}
-predict(svyratio(~murder, ~Population,
-                 design = srs_design),
-        total = sum(wa_crime_df$Population))
+predict(
+  svyratio(~murder, ~Population,
+    design = srs_design
+  ),
+  total = sum(wa_crime_df$Population)
+)
 ```
 
 
@@ -4585,41 +4600,43 @@ in Lumley's election example does not appear to work here...
  total number of murders in the state.
  
 ```{r q6_2d}
-agency_sample <- wa_crime_df %>% 
-  filter(County == "king") %>% 
-  distinct(Agency) %>% 
-  slice_sample(n = 10) %>% 
+agency_sample <- wa_crime_df %>%
+  filter(County == "king") %>%
+  distinct(Agency) %>%
+  slice_sample(n = 10) %>%
   pull(Agency)
 
-non_king_county_sample <- wa_crime_df %>% 
-  filter(County != "king") %>% 
-  distinct(County) %>% 
-  slice_sample(n = 10) %>% 
+non_king_county_sample <- wa_crime_df %>%
+  filter(County != "king") %>%
+  distinct(County) %>%
+  slice_sample(n = 10) %>%
   pull(County)
 
 county_list <- unique(wa_crime_df$County)
 
-strata_design <- wa_crime_df %>% 
-  filter(County %in% non_king_county_sample | Agency %in% agency_sample) %>% 
+strata_design <- wa_crime_df %>%
+  filter(County %in% non_king_county_sample | Agency %in% agency_sample) %>%
   mutate(
     strata_label = if_else(County == "king", "strata 1", "strata 2"),
     num_counties = if_else(County == "king", 1, length(county_list) - 1)
-    ) %>% 
+  ) %>%
   as_survey_design(
     id = c(County, Agency),
     fpc = c(num_counties, num_agencies),
     strata = strata_label
-  ) 
-  
-  
+  )
+
+
 poisson_fit <- svyglm(murder ~ I(log(Population)) + strata_label,
-                      design = strata_design, 
-                      family = quasipoisson)
+  design = strata_design,
+  family = quasipoisson
+)
 # doesn't produce appropriate output
 # predict(poisson_fit, total = total_population)
-sum(predict(poisson_fit, 
-            newdata = wa_crime_df %>% mutate(strata_label = if_else(County == "king", "strata 1", "strata 2")),
-            type = "response"))
+sum(predict(poisson_fit,
+  newdata = wa_crime_df %>% mutate(strata_label = if_else(County == "king", "strata 1", "strata 2")),
+  type = "response"
+))
 ```
 This estimate appears to again, make sense though we have no standard error
 estimate readily available to compare with the previous. One would guess that
@@ -4648,9 +4665,10 @@ this question unanswered.
  race (`racecen`) and interactions may also be important.
  
 ```{r q6_4a}
-fit <- svyglm(I((ins==1)*1) ~ ak22_p + srage_p + srsex,
-              design = chis,
-              family = quasibinomial)
+fit <- svyglm(I((ins == 1) * 1) ~ ak22_p + srage_p + srsex,
+  design = chis,
+  family = quasibinomial
+)
 summary(fit)
 ```
 
@@ -4671,11 +4689,12 @@ sex (`srsex`) and race (`racecen`) . Compare the coefficients to those from a
 logistic regression.
 
 ```{r q6_5a, eval = FALSE}
-fit <- svyglm(I((ins==1)*1) ~ ak22_p,
-              design = chis,
-              family = quasibinomial(link="log"), 
-              start = c(-.5, 0),
-              control = list(maxit = 150))
+fit <- svyglm(I((ins == 1) * 1) ~ ak22_p,
+  design = chis,
+  family = quasibinomial(link = "log"),
+  start = c(-.5, 0),
+  control = list(maxit = 150)
+)
 summary(fit)
 ```
 
@@ -4697,17 +4716,19 @@ Fit proportional odds regression models to investigate the association between
 dietary sodium and potassium and hypertension.
 
 ```{r q6_6}
-nhanes <- nhanes %>% 
+nhanes <- nhanes %>%
   mutate(
     ordinal_high_bp = factor(dplyr::case_when(
       BPXSAR < 120 & BPXDAR < 80 ~ "Normal",
-      (BPXSAR < 140 & BPXSAR >= 120) & (BPXDAR >= 80 & BPXDAR < 90) ~ 
+      (BPXSAR < 140 & BPXSAR >= 120) & (BPXDAR >= 80 & BPXDAR < 90) ~
         "PreHypertension",
-      (BPXSAR >= 140 & BPXSAR < 160) & (BPXDAR >=90 & BPXDAR < 100) ~ 
+      (BPXSAR >= 140 & BPXSAR < 160) & (BPXDAR >= 90 & BPXDAR < 100) ~
         "Hypertension Stage 1",
-      BPXSAR >= 160 & BPXDAR >= 100  ~ "Hypertension Stage 1"
-    ), levels = c("Normal", "PreHypertension", "Hypertension Stage 1",
-                  "Hypertension Stage 2"))
+      BPXSAR >= 160 & BPXDAR >= 100 ~ "Hypertension Stage 1"
+    ), levels = c(
+      "Normal", "PreHypertension", "Hypertension Stage 1",
+      "Hypertension Stage 2"
+    ))
   )
 
 des <- svydesign(
@@ -4734,12 +4755,12 @@ fruit or vegetables per day (`X_FV5SRV`), binge drinking of alcohol
 binary. You will need to remove missing values, coded 7,8 or 9.
 
 ```{r q6_7, eval = FALSE}
-brfss_sub <- subset(brfss, X_STATE == 12 & !any(VIGPACT %in% c(7,8,9)) &
-                      !any(X_FV5SRV %in% 7:9) & !any(X_RFBING4 %in% 7:9) &
-                      !any(HIVTST5 %in% 7:9) & !any(HEPBVAC %in% 7:9) & 
-                      !any(X_AGE_G %in% 7:9) & !any(X_SEXG_ %in% 7:9))
-loglin_fit <- svyloglin(~VIGPACT + X_FV5SRV + X_RFBING4 + HIVTST5 + HEPBVAC + 
-                          X_AGE_G + X_SEXG_, design = brfss_sub)
+brfss_sub <- subset(brfss, X_STATE == 12 & !any(VIGPACT %in% c(7, 8, 9)) &
+  !any(X_FV5SRV %in% 7:9) & !any(X_RFBING4 %in% 7:9) &
+  !any(HIVTST5 %in% 7:9) & !any(HEPBVAC %in% 7:9) &
+  !any(X_AGE_G %in% 7:9) & !any(X_SEXG_ %in% 7:9))
+loglin_fit <- svyloglin(~ VIGPACT + X_FV5SRV + X_RFBING4 + HIVTST5 + HEPBVAC +
+  X_AGE_G + X_SEXG_, design = brfss_sub)
 summary(loglin_fit)
 ```
 
@@ -5170,24 +5191,175 @@ if replicate weights are available, then a full estimate is available.
 
 ## Questions
 
-1. Using the WA State Criem population, take a stratified random sample of five
+1. Using the WA State Crime population, take a stratified random sample of five
 police districts from King County and five counties from the rest of the state.
+
+Setting up the sample design similar to before...
+
+```{r q71}
+agency_sample <- wa_crime_df %>%
+  filter(County == "king") %>%
+  distinct(Agency) %>%
+  slice_sample(n = 10) %>%
+  pull(Agency)
+
+non_king_county_sample <- wa_crime_df %>%
+  filter(County != "king") %>%
+  distinct(County) %>%
+  slice_sample(n = 10) %>%
+  pull(County)
+
+county_list <- unique(wa_crime_df$County)
+
+strata_design <- wa_crime_df %>%
+  filter(County %in% non_king_county_sample | Agency %in% agency_sample) %>%
+  mutate(
+    strata_label = factor(if_else(County == "king", "strata 1", "strata 2")),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1)
+  ) %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties, num_agencies),
+    strata = strata_label
+  )
+```
 
 * a. Calibrate the sample using stratum and population as the auxiliary 
 variables. Estimate the number of murders and number of burglaries in the state 
-using the calibrated and uncalibrated sample.
+using the calibrated and un-calibrated sample.
 
-* b. Convert the original survey design object to use jacknife replicate weights.
-Calibrate the replicate-weight design using the same auxiliary variables and 
-estimate the number of burglaries and of murders in the state.
+```{r q71a}
+pop_size <- wa_crime_df %>%
+  summarize(p = sum(Population)) %>%
+  pull(p)
+non_king_county_pop_size <- wa_crime_df %>%
+  filter(County != "king") %>%
+  summarize(p = sum(Population)) %>%
+  pull(p)
 
-* c. Calibrate the sample using the population and number of burgarlies in the
-previous year as auxiliary variables, and estimat the number of burglaries and 
+pop.totals <- c(
+  "(Intercept)" = pop_size,
+  "strata_labelstrata 2" = non_king_county_pop_size
+)
+wa_crime_cal <- calibrate(strata_design,
+  formula = ~strata_label,
+  population = pop.totals
+)
+rbind(
+  c("calibration", svytotal(~murder_and_crime, wa_crime_cal)),
+  c("Sample-Based", svytotal(~murder_and_crime, strata_design))
+)
+```
+
+The calibration numbers look *far* too high here, which is puzzling given that
+the weights should be exactly calibrated to better reproduce the population
+total.
+
+
+* b. Convert the original survey design object to use jackknife replicate 
+weights. Calibrate the replicate-weight design using the same auxiliary 
+variables and estimate the number of burglaries and of murders in the state.
+
+```{r q71b}
+rep_design <- survey::as.svrepdesign(strata_design)
+
+wa_crime_rep_cal <- calibrate(rep_design,
+  formula = ~strata_label,
+  population = pop.totals
+)
+svytotal(~murder_and_crime, wa_crime_rep_cal)
+```
+
+This produces the same, erroneous, number as before.
+
+* c. Calibrate the sample using the population and number of burglaries in the
+previous year as auxiliary variables, and estimate the number of burglaries and 
 murders in the state.
 
+```{r q71c, eval = FALSE}
+wa_crime_03_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx",
+  skip = 4
+) %>%
+  filter(Year == "2003", Population > 0) %>%
+  mutate(
+    murder_and_crime = `Murder Total` + `Burglary Total`,
+    violent_crime = `Violent Crime Total`,
+    burglaries = `Burglary Total`,
+    property_crime = `Property Crime Total`,
+    state_pop = sum(Population),
+    County = stringr::str_to_lower(County),
+    num_counties = n_distinct(County),
+  ) %>%
+  group_by(County) %>%
+  mutate(num_agencies = n_distinct(Agency)) %>%
+  ungroup() %>%
+  select(
+    County, Agency, Population, murder_and_crime, burglaries, property_crime,
+    violent_crime, num_counties, num_agencies
+  )
+
+cols_to_keep <- c(
+  "County", "Agency", "Population", "burglaries",
+  "num_counties", "num_agencies", "murder_and_crime", "violent_crime",
+  "property_crime"
+)
+wa_crime_df_mod <- wa_crime_df %>%
+  select(all_of(cols_to_keep)) %>%
+  rename_if(is.numeric,function(x) str_c(x,"_04"))
+
+sample_design <- wa_crime_03_df %>%
+  select(all_of(cols_to_keep)) %>%
+  rename_if(is.numeric,function(x) str_c(x,"_03")) %>% 
+  right_join(wa_crime_df_mod) %>% 
+  filter(
+    (County %in% non_king_county_sample |
+      Agency %in% agency_sample)
+  ) %>%
+  mutate(
+    strata_label = factor(if_else(County == "king", "strata 1", "strata 2")),
+    num_counties = if_else(County == "king", 1, length(county_list) - 1)
+  ) %>%
+  as_survey_design(
+    id = c(County, Agency),
+    fpc = c(num_counties_04, num_agencies_04),
+    strata = strata_label
+  )
+
+pop_03 <- wa_crime_03_df %>% summarize(P = sum(Population)) %>% pull(P)
+
+previous_year_calibration <- calibrate(sample_design,
+                                       formula = ~ burglaries_03,
+                                       population = c("(Intercept)" = pop_size,
+                                                      "burglaries_03" = pop_03)
+                                       )
+svytotal(~burglaries_04, previous_year_calibration)
+```
+
+Here I get an error message that one of the inner computations doesn't have
+the correct dimensions. I suspect this is a bug in Lumley's code as the 
+sampling design I constructed above isn't too complicated.
+
 * d. Estimate the ratio of violent crimes to property crimes in the state, 
-using the uncalibrated sample and the sample calibrated on population and 
+using the un-calibrated sample and the sample calibrated on population and 
 number of burglaries.
+
+
+```{r q7_1d}
+strata_design %>% 
+  summarize(
+    ratio = survey_ratio(violent_crime, property_crime)
+  )
+```
+
+```{r q7_1d_, eval = FALSE}
+svyratio(numerator = ~violent_crime_04, 
+         denominator = ~property_crime_04,
+         design = previous_year_calibration)
+```
+
+Again, the sample based estimator makes sense here, while the calibrated 
+estimator has issues. So far this is my best understanding of how to apply
+Lumley's code but I'll try to revisit this in the future.
 
 2. Write an R function that accepts a set of 50 elephant weights and simulates
 repeatedly choosing a single elephant and computing the Horvitz-Thompson and
@@ -5196,10 +5368,85 @@ the repeated simulations. Explore the behavior for several sets of elephant
 weights. Verify that the Horvitz-Thompson estimator is always unbiased, but 
 usually further from the truth than the ratio estimator.
 
-3. Write an R function taht accepts a set of 50 elephant weights and performs
+```{r q7_2}
+BasuHTE <- function(elephant_weights) {
+  N <- length(elephant_weights)
+  sambo <- which.min(abs(elephant_weights - mean(elephant_weights)))
+  sample_probs <- rep((1-0.99) / (N-1), N)
+  sample_probs[sambo] <- 0.99
+  # Okay to use the base R sample implementation here because we're only
+  # sampling 1 item.
+  x_ix <- sample(1:N, size = 1, prob = sample_probs)
+  hte_weight <- 1 / sample_probs[x_ix] * elephant_weights[x_ix]
+  ratio_estimate <- N * elephant_weights[x_ix]
+  return(c("hte" = hte_weight, "ratio" = ratio_estimate))
+}
+elephant_is_male<- rbinom(50, size = 1, prob = 0.5)
+elephant_weights <- elephant_is_male * rnorm(50, mean = 1.3E4, sd = 2E3) +
+  (1 - elephant_is_male) * rnorm(50, mean = 6.6E3, sd = 1E3)
+results <- as_tibble(t(replicate(1000, BasuHTE(elephant_weights)))) %>% 
+  mutate(rep_ix = 1:n()) %>% 
+  gather(hte,ratio,key="estimator",value="estimate") %>% 
+  group_by(estimator) %>% 
+  mutate(mean = mean(estimate), sd = sd(estimate)) %>% 
+  ungroup()
+```
+
+```{r q7_2_results}
+true_total <- sum(elephant_weights)
+results %>% 
+  ggplot(aes(x = estimate, fill = estimator)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = mean, color = estimator)) + 
+  geom_vline(aes(xintercept = true_total), linetype = 2, color = "red") +
+  facet_wrap(~estimator) +
+  ggtitle("Illustrating Basu's Elephants")
+```
+
+```{r q7_2_unbiased}
+results %>% 
+  filter(estimator == "hte") %>% 
+  summarize(average_estimate = mean(estimate)) %>% 
+  mutate(bias = average_estimate - true_total,
+         truth = true_total)
+```
+
+3. Write an R function that accepts a set of 50 elephant weights and performs
 the ranked set sampling procedure on page 150 to choose three of them. By
-simulation, compare the bias and variance of the stimated total from ranked-set
+simulation, compare the bias and variance of the estimated total from ranked-set
 sample to estimated totals from a simple random sample of three elephants.
+
+```{r q7_3}
+RankedSetSampleComparison <- function(elephant_weights) {
+  srs_sample <- sample(elephant_weights, size = 3)
+  sampling_weight <- length(elephant_weights) / 3
+  srs_total <- sum(srs_sample * length(elephant_weights) / 3)
+  rs_sample_one <- sample(elephant_weights, size = 3)
+  rs_sample_two <- sample(elephant_weights, size = 3)
+  rs_sample_three <- sample(elephant_weights, size = 3) 
+  rs_total <- rs_sample_one[which.min(rank(rs_sample_one))] * sampling_weight + 
+  rs_sample_two[which(rank(rs_sample_two) == 2)] * sampling_weight + 
+    rs_sample_three[which.max(rank(rs_sample_three))] * sampling_weight
+  return(c("Ranked Set Estimate" = rs_total, "SRS Total"= srs_total))
+}
+results <- as_tibble(t(replicate(1000,
+                                 RankedSetSampleComparison(elephant_weights)))) %>% 
+  mutate(rep_ix = 1:n()) %>% 
+  gather(everything(), -rep_ix, key = "estimator", value = "estimate") %>% 
+  group_by(estimator) %>% 
+  mutate(mean = mean(estimate), sd = sd(estimate))
+```
+
+```{r}
+results %>% 
+  ggplot(aes(x = estimate, fill = estimator)) + 
+  geom_histogram() + 
+  geom_vline(aes(xintercept = true_total), linetype = 2) +
+  ggtitle("Ranked Set and Simple Random Sample Estimator Comparison")
+```
+
+As seen above the ranked set estimator has much lower variability, while 
+maintaining the same mean estimate as compared to the simple random sample.
 
 4. Estimate the proportions of people in CA with normal weight, overweight and 
 obesity using the BRFSS 2007 data (X_STATE = 6, X_BMI4CAT = BMI). Post-stratify
@@ -5207,6 +5454,71 @@ the CA data to have the same age and sex distribution as the data for FL
 (X_STATE = 12) and compute the directly standardized estimates based on CA
 data to estimates form the data for FL to see if the differences in BMI 
 between the states are explained by differences in age distribution.
+
+```{r q7_4}
+db <- DBI::dbConnect(RSQLite::SQLite(), "Data/BRFSS/brfss07.db")
+brfss_ca <- tbl(db,sql("SELECT * FROM brfss")) %>% filter(X_STATE == 6) %>% 
+  collect() %>% 
+  mutate(
+    BMI_Cat = case_when(
+      X_BMI4CAT == 1 ~ "Normal BMI",
+      X_BMI4CAT == 2 ~ "Overweight BMI",
+      X_BMI4CAT == 3 ~ "Obese BMI",
+      TRUE ~ NA
+    )
+  ) %>% 
+  as_survey_design(
+    id = X_PSU, strata = X_STATE, weight = X_FINALWT,
+    nest = TRUE
+  )
+
+brfss_ca %>% 
+  group_by(BMI_Cat) %>% 
+  summarize(
+    proportion = survey_mean()
+  )
+```
+
+```{r q7_4_poststratify}
+brfss_fl <- tbl(db, sql("SELECT * FROM brfss WHERE X_STATE == 12")) %>% 
+  collect() %>% 
+  mutate(
+    BMI_Cat = case_when(
+      X_BMI4CAT == 1 ~ "Normal BMI",
+      X_BMI4CAT == 2 ~ "Overweight BMI",
+      X_BMI4CAT == 3 ~ "Obese BMI",
+      TRUE ~ NA
+    )
+  ) %>% 
+  as_survey_design(
+    id = X_PSU, strata = X_STATE, weight = X_FINALWT, nest = TRUE
+  )
+
+fl_sex_age_totals <- brfss_fl %>% 
+  group_by(SEX,X_AGE_G) %>%
+  survey_count() %>% 
+  select(-n_se) %>% 
+  rename(Freq = n)
+
+postStratify(design = brfss_ca, strata = ~SEX + X_AGE_G, 
+             population = fl_sex_age_totals) %>% 
+  svymean(~BMI_Cat, design = ., na.rm = TRUE)
+```
+
+
+```{r q7_4_og_stratify}
+brfss_fl %>% 
+  group_by(BMI_Cat) %>% 
+  summarize(
+    proportion = survey_mean()
+  )
+```
+
+In general we see that the two estimates - the post stratified estimate and the
+"direct" estimates largely agree, for the proportion of Obese and Overweight
+BMI estimates. The normal BMI Estimates appear to be substantially different 
+which may be due to factors that aren't unaccounted for in the age and sex 
+strata.
 
 5. Consider a categorical post-stratification variable with $K$ categories
 having as population counts $N_1, N_2,...N_K$. Suppose we are interested in 
@@ -5245,17 +5557,24 @@ two, conditional on being sampled in phase one.
 ```{r nwts_2phase_demo}
 nwts <- nwtsco
 set.seed(1337)
-subsample <- with(nwts, c(which(relaps == 1 | instit == 1),
-                          sample(which(relaps == 0 & instit == 0), 499)))
+subsample <- with(nwts, c(
+  which(relaps == 1 | instit == 1),
+  sample(which(relaps == 0 & instit == 0), 499)
+))
 nwts$in.subsample <- (1:nrow(nwts)) %in% subsample
-nwts_design <- twophase(id = list(~1, ~1), subset = ~in.subsample,
-                        strata = list(NULL, ~interaction(instit, relaps)), 
-                        data = nwts)
+nwts_design <- twophase(
+  id = list(~1, ~1), subset = ~in.subsample,
+  strata = list(NULL, ~ interaction(instit, relaps)),
+  data = nwts
+)
 nwts_design
 ```
 # Chapter 9: Missing Data
 
+
+
 # Chapter 10: Causal Inference
+
 
 # Session Info
 
