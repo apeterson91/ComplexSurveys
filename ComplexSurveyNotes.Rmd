@@ -30,6 +30,7 @@ library(RSQLite)
 library(DiagrammeR)
 library(lattice)
 library(quantreg)
+library(gtsummary)
 library(sf)
 theme_set(theme_bw() + theme(
   text = element_text(size = 18),
@@ -5399,7 +5400,7 @@ results %>%
   geom_histogram() +
   geom_vline(aes(xintercept = mean, color = estimator)) + 
   geom_vline(aes(xintercept = true_total), linetype = 2, color = "red") +
-  facet_wrap(~estimator) +
+  facet_wrap(~estimator, nrow = 2) +
   ggtitle("Illustrating Basu's Elephants")
 ```
 
@@ -5410,6 +5411,10 @@ results %>%
   mutate(bias = average_estimate - true_total,
          truth = true_total)
 ```
+
+From the plot above we can see that the horvitz thompson estimator is more
+variable than the ratio estimator though both provide the appropriate estimate
+on average.
 
 3. Write an R function that accepts a set of 50 elephant weights and performs
 the ranked set sampling procedure on page 150 to choose three of them. By
@@ -5532,6 +5537,20 @@ $$
 where $\hat{\mu}_k$ is the estimated mean of $Y$ in group $K$ before 
 post-stratification.
 
+We'll start with using the result derived in the text that shows when we 
+post-stratify we scale the weights, $\pi_i^* = \frac{g_i}{\pi_i}$, such that
+the estimated strata size is exactly equal to the known (post) strata size. 
+This results in a $g_i = \frac{N_k}{\hat{N_k}}$ scaling weight.
+
+For our post-stratified total estimate then we have
+$$
+\hat{T}_{ps} = \sum_{i=1}^{n} y_iI(y_i \in S_k) \frac{N_k}{\hat{N}_k} \\
+= \sum_{k=1}^{K} \hat{\mu}_k N_k
+$$
+Where the mean estimate, $\hat{\mu}_k$ comes from dividing the $y_i$ in each 
+$k$ group by the $\hat{N}_k$ denominator.
+
+
 * b. Show that the regression estimate from a model with indicator variables
 for each group is also 
 
@@ -5539,6 +5558,18 @@ $$
 \hat{T}_{reg} = \sum_{k=1}^{K} N_k \hat{\mu}_k
 $$
 
+This follows in a straightforward fashion from a regression model set-up. If we
+fit the following model:
+$$
+E[Y_i] = \beta_k I(y_i \in S_k)
+$$
+Then it follows that 
+$$
+\hat{\beta}_k = \hat{\mu}_k = \frac{1}{n_k} \sum_{i=1}^{n}y_iI(y_i \in S_k), k = 1,...,K
+$$
+Predicting a new total then with the new counts re-weighted amounts to a 
+regression prediction 
+$\hat{T}_{ps} = \sum_{k=1}^{K} N_k \hat{\beta}_k = \sum_{k=1}^{K} N_k \hat{\beta}_k$
 
 # Chapter 8: Two-Phase Sampling
 
@@ -5551,11 +5582,186 @@ sample. Consequently, instead of having two sampling probabilities which are
 multiplied by each other $\pi_1 \times \pi_2$ we have conditional weights
 $\pi_1$ and $\pi_{2|1}$ which describe the probability of an entity being
 sampled in phase one and the the probability of a phase being sampled in stage
-two, conditional on being sampled in phase one.
+two, conditional on being sampled in phase one. Multiplying and differencing
+these two probabilities together can be used to construct an estimator very
+similar to the horvitz-thompson estimator, though is theoretically distinct.
+Lumley notes here that his software and exposition only covers the simple cases 
+of both types of sampling designs described here can be expanded to cover 
+multiple phases and combinations of both types of designs.
 
+## Sampling for Stratification
+
+One common motivation for two-phase sampling is to measure some strata variable
+on a sample of the populations. The first phase sample is a random sample of 
+the general population on which the strata variable is then measured. The second
+phase of sampling then stratifies on this variable for greater precision.
+
+Lumley gives several examples of this setup including the NHANES and NHIS 
+surveys. Though the data associated with these are not made publicly available,
+unfortunately.
+
+
+## The Case-Control Design
+
+> A type of sampling for stratification is the case-control design
+(or choice-based design in economics).
+
+This design is used when the measure of interest is particularly sparse or rare
+in the population. The basic setup is the same as described in the previous 
+section where the rare disease is measured in the first phase sample from a 
+hopefully well specified population. The second phase samples all individuals
+with the disease (cases) and some proportion of the controls. Typically matching
+$k$ controls to each case.
+
+A few brief notes Lumley makes here:
+
+1. If done properly, the design effect is very large for this design; this 
+design is far more efficient than a simple random sample proportional to the 
+sparsity of the disease.
+2. Two competing interests in selecting controls that leads to criticism of this
+design --- they have to be representative of the population, but also good
+"matches" for the cases. They need to be comparable in some way.
+3. Design based inference was not as frequently used for case control designs.
+  -- Because the odds ratio estimate is independent of the sampling fraction and
+the estimated standard errors are typically less, a model based approach is
+often used. However, this requires the model to be specified correctly 
+which is not always the case. 
+  -- Lumley notes that there seems to be less hesitancy about using either
+  design based approach or a model based approach as there once was. 
+
+### Oesophageal cancer in Ille-et-Vilaine
+
+
+Lumley re analyzes data published as part of a previous study 
+[@breslow1980statistical] [@aj1977cancer] looking at esophageal cancer in 
+northwest France as impacted by of alcohol and tobacco consumption.
+
+Lumley gets a control sampling weight of 441 by digging around in the related
+papers and uses this to expand the original dataset, which contains the 
+aggregate numbers to construct a survey design object below.
+```{r esoph_demo}
+cases <- cbind(esoph[rep(1:88, esoph$ncases), ], case = 1, weight = 1)
+controls <- cbind(esoph[rep(1:88, esoph$ncontrols), ], case = 0, weight = 441)
+esoph.x <- rbind(cases, controls)
+d_esoph <- svydesign(id = ~1, strata = ~case, weights = ~weight, 
+                     data = esoph.x)
+unwtd <- glm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp), 
+             data = esoph.x, family = binomial())
+wtd <- svyglm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp), 
+              design = d_esoph, family = quasibinomial)
+coef(unwtd)[7:8]
+coef(wtd)[7:8]
+SE(unwtd)[7:8]
+SE(wtd)[7:8]
+```
+
+```{r esoph_demo_2}
+tbl_merge(tbls = list(tbl_regression(unwtd), tbl_regression(wtd)),
+          tab_spanner = c("**Unweighted**","**Weighted**")
+)
+```
+
+
+Regardless of which model is used, both show that tobacco and alcohol use 
+increases the odds of esophageal cancer, though the un-weighted model does have
+slightly smaller confidence intervals for the coefficients of interest,
+as we can see in the table above.
+
+### Simulations: efficiency of the design-based estimator
+
+In this section Lumley computes the relative efficiency of the weighted 
+estimator relative to the weighted comparing different distributions of 
+cases and controls. Lumley defines the relative efficiency as the 
+number of observations needed to produce the same accuracy but it isn't clear
+how accuracy is measured here (length of standard error?). Since he doesn't
+show how he computes the resulting table, I've omitted his example from my 
+notes.
+
+
+
+### Frequency matching
+
+> Many case-control designs use a further level of stratification and unequal 
+sampling in the phase-two sample, a practice known in the epidemiology 
+literature as *frequency matching*.  
+
+The idea is to avoid wasting cases / controls in regions of low exposure. 
+Lumley uses the example of the oesphageal cancer study to illustrate. Bracket
+text below is mine:
+
+> ... very little information about the effects of alcohol and tobacco is 
+present in the youngest age group, because there is only one case. If the 
+associations with age had already been understood and the study had been 
+designed to estimate the effect of alcohol and tobacco [only] this would be an
+inefficient design that effectively wasted 116 controls. A more efficient
+design would saple more controls at older ages and end up with five controls 
+per case in each age group rather than five controls per case on average over 
+all ages.
+
+Lumley goes on to say that frequency matching isn't the most efficient way to
+use the age information, but he doesn't say what would be. I'm guessing he's
+thinking of further stratification or unequal sampling but I can't be sure. 
+
+
+## Sampling from Existing Cohorts
+
+Lumley notes in this section that it is often advantageous in larger
+randomized control trials or cohort studies to subsample once certain 
+measurements have been taken. Lumley gives an account of methods used on these
+data --- previously nested case control designs, ignoring the phase one sample 
+and cohort representativeness but more recently stratifying on both outcome and 
+covariates in phase two and post-stratifying to the original cohort. 
+The trade-offs between model and design based approaches are/were not clear
+at the date of publication in this setting. My take is that the design based
+approach seems better given how many design elements are involved in the
+construction of the study.
+
+### Logistic regression
+
+|         | Exposed | Unexposed |
+|---------|---------|-----------|
+| Case    | a       | b         |
+| Control | c       | d         |
+| Total   | a+c     | b + d     |
+
+Lumley's goal in this section is to show how case control designs can be 
+optimised to reduce the variance associated with the odds ratio estimate, 
+typically estimated via logistic regression. Starting from a 2 x 2 contigency 
+table like that shown above the variance of the log of the  odds ratio can be
+estimated as follows:
+
+$$
+V[\log \psi] = \frac{1}{a} + \frac{1}{b} + \frac{1}{c} + \frac{1}{d},
+$$
+
+where $\psi$ represents the odds of the disease in the exposed cases vs the
+odds of disease in the exposed controls. From the expression above, we see that
+if we increase any of the cell counts, we decrease the variance. However,
+a classic case control design will only control the table row margins, meaning
+there might be greater improvement in controlling the sampling from the 
+exposure covariate(s) as well. 
+
+However, in that setting the classic logistic regression model no longer gives
+a valid analysis because the odds ratio will be impacted by the unequal 
+sampling fractions amongst the exposure covariate. In that case, a design based
+approach is necessary. 
+
+Lumley uses the National Wilms Tumor Study group to illustrate this idea. 
+Kidney histology was available for all members of the study. Although the 
+initial histology had an appreciable error rate, it could still be used to 
+sample from. Though Lumley does not give an exact procedure for how he does this
+he shows a table of of biased sampling that includes 183 controls with 
+unfavorable histology ratings, a higher number than what would be included with
+random sampling matched case-control procedure.
+
+
+### Two-phase case-control designs in R
+
+Lumley illustrates how to fit a two-phase sample estimate using the national
+wilms tumor study data. The code and model output are below.
 
 ```{r nwts_2phase_demo}
-nwts <- nwtsco
+nwts <- addhazard::nwtsco
 set.seed(1337)
 subsample <- with(nwts, c(
   which(relaps == 1 | instit == 1),
@@ -5569,6 +5775,182 @@ nwts_design <- twophase(
 )
 nwts_design
 ```
+
+```{r nwts_ccs_demo}
+set.seed(1337)
+casectrl <- with(nwts, c(which(relaps==1), sample(which(relaps ==0), 699)))
+nwts$in.ccs <- (1:nrow(nwts)) %in% casectrl
+ccs_design <- twophase(id = list(~1, ~1), subset = ~in.ccs,
+                       strata = list(NULL, ~ relaps), data = nwts)
+m1 <- svyglm(relaps ~ histol * stage + age + tumdiam, design = nwts_design,
+             family = quasibinomial())
+m2 <- svyglm(relaps ~ histol * stage + age + tumdiam, design = ccs_design, 
+             family = quasibinomial())
+m3 <- glm(relaps ~ histol * stage + age + tumdiam, data = nwts, subset = in.ccs,
+          family = binomial())
+m1a <- svyglm(relaps ~ histol * stage + age + tumdiam, design = nwts_design,
+              family = quasipoisson(log))
+m2a <- svyglm(relaps ~ histol * stage + age + tumdiam, design = ccs_design,
+              family = quasipoisson(log))
+```
+
+```{r}
+tbl_merge(tbls = list(tbl_regression(m1, conf.int = FALSE),
+                      tbl_regression(m2, conf.int = FALSE),
+                      tbl_regression(m3, conf.int = FALSE),
+                      tbl_regression(m1a, conf.int = FALSE),
+                      tbl_regression(m2a, conf.int = FALSE)),
+          tab_spanner = c("Two Phase Design based Odds Ratio",
+                          "CC Design Based Odds Ratio",
+                          "Model Based Odds Ratio",
+                          "Two Phase Design Based Relative Risk",
+                          "CC Design Based Relative Risk"))
+```
+
+Few quick things to note:
+
+1. The estimates between the relative risk rate ratio and odds ratio vary 
+substantially, as we'd expect.
+2. There is an appreciable precision gain in the `histol` x `stage` estimates 
+comparing the design based to the model based, with a slight gain from using 
+the `instit` for sampling in the more general two-phased sampling model.
+3. Lumley notes that model based analysis are also available for two-phased 
+samples. In my training we learned how to use a conditional logistic regression
+in this setting. You can see a similar example 
+[here](https://www.bookdown.org/rwnahhas/RMPH/blr-conditional.html).
+
+
+### Survival Analysis
+
+In this section Lumley briefly introduces the concept of the case-cohort study,
+as well as the topic of survival analysis. Notes on each below.
+
+
+**Case-Cohort Study**
+
+* A two phase sample in which the the second phase sample is a sub-cohort chosen
+at the beginning in addition to all cases identified during follow-up.
+* Lumley notes that this initial sub-cohort can be used for comparing against
+multiple types of measured "cases" or events, in contrast to a case-control 
+design which is constrained to analysis of the single type of case.
+
+
+**Survival Analysis**
+
+* Survival analysis is a large enough topic to be given its own book but here
+Lumley focuses on the Cox proportional hazards model, which estimates
+the hazard function, or instantaneous rate of an event (like cancer relapse) 
+occuring as a function of some covariates.
+
+* Notably, survival analysis incorporates assumptions for censoring, or the 
+unobservance of the event occuring within the follow-up period.
+
+#### Case Cohort Designs
+
+Lumley uses the Wilms Tumor study again, to illustrate how a case-cohort 
+analysis can be used to estimate patients survival from Wilms tumor as a 
+function of the measured covariates. Here's the setup in Lumley's own words:
+
+> For the classical case-cohort analysis we take a sample from the cohort at the
+start of the followup and then add all the cases to it. If the expected event
+rate is about 1 in 7, giving about 650 expected cases, and we want 650 non-cases,
+this means sampling a subcohort of 650 x 7/6 or about 750... Under this 
+sampling design there are two sampled strata: those in the subcohort and those
+not in the subcohort. The sampling probabilities are $\pi_{(2|1)} = 750 / 3915$
+for the subcohort and $\pi_{(2|1)} = 1$ for cases not in the subcohort.
+
+The code is below.
+
+```{r wilms_case_cohort}
+set.seed(1729)
+subcohort <- with(nwts, sample(1:nrow(nwts), 750))
+cases <- which(nwts$relaps == 1)
+nwts$in.cchsample <- (1:nrow(nwts)) %in% c(subcohort, cases)
+nwts$in.subcohort <- (1:nrow(nwts)) %in% subcohort
+nwts$wts <- ifelse(nwts$in.subcohort, 3915/750, 1)
+cch_design <- twophase(id = list(~1, ~1), subset = ~in.cchsample,
+                       strata = list(NULL, ~in.subcohort),
+                       weights = list(NULL, ~wts),
+                       method = "approx",
+                       data = nwts)
+
+s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam, 
+         design = cch_design)
+
+cch_data <- subset(nwts, in.cchsample)
+cch_data$id <- 1:nrow(cch_data)
+# "classic" analysis based only on phase 2 data
+s2 <- cch(Surv(trel, relaps) ~ histol * stage + age + tumdiam, id = ~id,
+    data = cch_data, subcoh = ~in.subcohort, cohort.size = 3915)
+tbl_merge(tbls = list(tbl_regression(s1), tbl_regression(s2)), 
+          tab_spanner = c("**Case-Cohort Analysis**", 
+                          "**Classic Phase 2 Analysis**"))
+```
+
+Looking at the table above, we can see that there's a decent amount of 
+disagreement between the two estimates. Lumley argues this is because of the 
+poor fit of the cox model. An assumption that's necessary for the Cox model
+to fit well is that the hazards functions are proportional across time. 
+As we see in the plot below and in the text, the hazard estimate for age is
+lower earlier in the trial than later on.
+
+```{r cox_ph_check_plot}
+plot(cox.zph(s1), var = "age")
+```
+
+Lumley notes that the case-cohort analysis could just as easily be framed as
+a stratified sample on cases in the second phase. The code below performs this
+analysis --- again using both case and case + institution for the stratifying
+variables. The last bit of code extracts the variance estimates that's from
+each phase of sampling and computes how much of the variance comes from the
+first phase as opposed to the second phase for each of the estimated 
+coefficients.
+
+```{r stratified-case-cohort-sample}
+scch_design <- twophase(id = list(~1, ~1), subset = ~in.cchsample,
+                        strata = list(NULL, ~relaps), data = nwts)
+
+s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam, 
+               design = scch_design)
+nwts_design <- twophase(id = list (~1, ~1), subset = ~in.subsample, 
+                        strata = list(NULL, ~interaction(instit, relaps)), 
+                        data = nwts)
+s2 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
+               design = nwts_design)
+
+
+v1 <- vcov(s1)
+v2 <- vcov(s2)
+
+rbind(
+  diag(attr(v1, "phases")$phase2 / attr(v1, "phases")$phase1),
+  diag(attr(v2, "phases")$phase2 / attr(v2, "phases")$phase1)
+  )
+```
+
+
+```{r case-cohort-comp-table}
+s3 <- coxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
+            data = nwts)
+tbl_merge(
+  tbls = list(tbl_regression(s1),
+              tbl_regression(s2),
+              tbl_regression(s3)),
+  c("**Stratified Case Cohort**",
+    "**Stratified Case Cohort - Institution**",
+    "**Full Data**")
+)
+```
+
+The above table contains the data from both of the stratified case-cohort 
+analyses as well as a model fit to the full data. The case-institution 
+stratified analysis is more efficient than only the case stratified analysis.
+Both design based analyses agree with the full data analysis, though, of course,
+the full data analysis has less variability. Interestingly though, it is not
+that much better than the stratified case-cohort-institution estimates.
+
+## Using Auxiliary Information from Stage 1
+
 # Chapter 9: Missing Data
 
 
@@ -5581,6 +5963,7 @@ nwts_design
 <details>
 
 ```{r session_info}
+DBI::dbDisconnect(db)
 sessionInfo()
 ```
 
