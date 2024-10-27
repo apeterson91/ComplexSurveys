@@ -5949,10 +5949,300 @@ Both design based analyses agree with the full data analysis, though, of course,
 the full data analysis has less variability. Interestingly though, it is not
 that much better than the stratified case-cohort-institution estimates.
 
-## Using Auxiliary Information from Stage 1
+## Using Auxiliary Information from Phase 1
+
+In this section Lumley reviews how information recorded on individuals during
+the first phase can be used to improve the precision of estimates in the second
+phase via calibration. Lumley differentiates the use of auxiliary information
+here as compared to chapter 7's review of post-stratification, raking 
+and calibration by noting the following 3 differences:
+
+1. The Phase one data includes individual level auxiliary variables.
+2. Re-weighting can be customized to a particular analysis.
+3. There may be --- when sampling from a cohort --- a large number of auxiliary 
+variables available.
+
+With this set-up Lumley discusses how to construct more effective auxiliary 
+variables using influence functions.
+
+### Population calibration for regression models
+
+Lumley motivates his discussion of influence functions with the api data, where
+we can reference the full population data.
+
+Lumley's description of influence functions are intentionally simple, 
+describing them as 
+
+> "The influence function for an estimate $\hat{\beta}$ describes how the 
+estimate changes when observations are added to or removed from the data."
+
+For linear, glms, and cox models, these are $\Delta\beta$ deletion diagnostics
+that are often taught as part of the statistics curriculum covering the 
+subjects.  For example, a simple linear regression has the following influence
+function for the slope parameter:
+$$
+\mathcal{I}(x_i, y_i; \beta) = \frac{1}{\pi_i}\frac{1}{V[X]}(x_i - \bar{x})(y_i - \mu_i(\beta)),
+$$
+
+where $\mu_i(\beta)$ is the fitted value for the $i$th observation. Lumley
+reasons that 
+
+> If an auxiliary variable $Z$ is highly correlated with $Y$ it will have a low 
+correlation with $\mathcal{I}$, because the multiplier $(x_i - \bar{x}) can be
+negative or positive with about equal probability.
+
+I don't quite see how Lumley is drawing the connection that
+$Cor(Y,Z) \approx 1 \implies Cor(Z,\mathcal{I}) \approx 0$ unless there is some
+way that $Z$'s impact on $Y$ is through $X$ --- epidemiologists would then say
+"The effect of $Z$ on $Y$ is mediated by $X$. I don't that's what Lumley's 
+referring to here...
+
+The next part makes sense - Lumley says that in order to construct new 
+variables for use in calibration, we can use the influence functions from
+linear regressions constructed from $Z \tilde X$. Though I should say, it 
+isn't clear to me *why* we might choose $Z$ as the regression variable here...
+
+In any case, Lumley demonstrates this with the api data, using the full
+population data to estimate the influence functions.
+
+
+```{r influence_functions_demo}
+m0 <- svyglm(api00~ ell + mobility + emer, clus1_design)
+var_cal <- calibrate(clus1_design, formula = ~api99 + ell + mobility + emer,
+                     pop = c(6194, 3914069, 141685, 106054, 70366),
+                     bounds = c(0.1, 10)
+)
+m1 <- svyglm(api00 ~ ell + mobility + emer, design = var_cal)
+
+
+popmodel <- glm(api99 ~ ell + mobility + emer, data = apipop,
+                na.action = na.exclude)
+
+inffun <- dfbeta(popmodel)
+index <- match(apiclus1$snum, apipop$snum)
+clus1if <- update(clus1_design, ifint = inffun[index, 1],
+                  ifell = inffun[index, 2], ifmobility = inffun [ index, 3], 
+                  ifemer = inffun[index, 4])
+if_cal <- calibrate(clus1if, formula = ~ifint + ifell + ifmobility + ifemer,
+                    pop = c(6194, 0, 0, 0 ,0))
+
+m2 <- svyglm(api00 ~ ell + mobility + emer, design = if_cal)
+tbl_merge(
+  tbls = list(tbl_regression(m0, intercept = TRUE),
+              tbl_regression(m1, intercept = TRUE),
+              tbl_regression(m2, intercept = TRUE)),
+  tab_spanner = c("Cluster Design", "Calibrated", "Influence Calibrated")
+)
+```
+
+We can see the precision in the estimates gets better as we move from the 
+sampled model to the influence calibrated model. 
+
+These can obviously get much more complex for more complex models.
+For more theory Lumley refers the reader to [@breslow1980statistical]. 
+
+### Two-phase designs
+
+The best case for using influence functions as above in a two-phase design is
+when a phase-one variable is correlated with the variable of interest measured
+in phase two. Lumley gives an example for when this might occur: Self-reported
+smoking at phase one then followed up by a urinary test in phase two. In this
+setting Lumley proposes the following approach for constructing auxiliary 
+variables based on influence functions.
+
+1. Build an imputation model to predict the phase-two variable from the 
+phase-one variables.
+
+2. Fit a model to all of phase one, using the imputed value for observations 
+that are not in the phase-two sample.
+
+3. Use the influence functions from this model as auxiliary variables in 
+calibration.
+
+In the API example, the imputation model step was replaced by using the previous
+year's API test values.
+
+
+#### Example: Wilms' tumor
+
+Lumley walks through [@breslow2009using]'s analysis of the NWTS data 
+illustrating this approach. Lumley walks through the analysis in the text which 
+has a clear mapping to the three steps above so I won't repeat him. The code to
+fit the imputation model and calibrations are shown below.
+
+```{r NWTS_inf_2phase}
+impmodel <- glm(histol ~ instit + I(age > 10) + I(stage == 4) * study,
+                data = nwts, subset = in.subsample, family = binomial())
+
+nwts$imphist <- predict(impmodel, newdata = nwts, type = "response")
+
+nwts$imphist[nwts$in.subsample] <- nwts$histol[nwts$in.subsample]
+
+ifmodel <- coxph(Surv(trel, relaps) ~ imphist * age + I(stage > 2) * tumdiam,
+                 data = nwts)
+
+inffun <- resid(ifmodel, "dfbeta")
+
+colnames(inffun) <- paste("if", 1:6, sep = "")
+nwts_if <- cbind(nwts, inffun)
+if_design <- twophase(id = list(~1, ~1), subset = ~in.subsample,
+                      strata = list(NULL, ~interaction(instit, relaps)),
+                      data = nwts_if)
+
+if_cal <- calibrate(if_design, phase = 2, calfun = "raking",
+                    formula = ~ if1 + if2 + if3 + if4 + if5 + if6 +
+                      relaps * instit)
+
+m1 <- svycoxph(Surv(trel, relaps) ~histol * age + I(stage > 2) * tumdiam, 
+               design = nwts_design)
+
+m2 <- svycoxph(Surv(trel, relaps) ~ histol * age + I(stage > 2) * tumdiam,
+               design = if_cal)
+m3 <- coxph(Surv(trel, relaps) ~ imphist * age + I(stage > 2) * tumdiam,
+            data = nwts)
+m4 <- coxph(Surv(trel, relaps) ~ histol * age + I(stage > 2) * tumdiam,
+            data = nwts)
+
+tbl_merge(
+  tbls = list(tbl_regression(m1),
+              tbl_regression(m2),
+              tbl_regression(m3),
+              tbl_regression(m4)
+              ),
+  tab_spanner = c("2-Phase Weighted",
+                  "2-Phase Raked",
+                  "2 Phase Imputed",
+                  "Full Data")
+)
+```
+
+As expected we see that the raking and imputation - influence model have
+the lowest standard errors. Lumley notes that this is often the case when the
+imputation model is very good, further stating that the raking approach has
+the advantage of always being valid, while the calibration depends on correct
+modeling.
+
+### Some history of the two phase calibration estimator
+
+Here Lumley gives a brief overview of the history of calibration and 
+augmented inverse-probability model based estimators, which were developed in
+parallel and have a large amount of overlap.
+
+I'd like to raise some questions I found myself asking as I read this last
+section on using auxiliary information from phase 1.
+
+1. The first concerns uncertainty estimates. Lumley doesn't mention it, but the
+use of an imputation model should incorporate greater uncertainty into our final
+estimates. It doesn't look like his software makes any effort to incorporate
+that uncertainty or how optimistic our final standard errors might be.
+
+
+2. The use of influence functions remind me of, but are not exactly similar to
+dimensionality reduction methods, like 
+[principle components analysis](https://en.wikipedia.org/wiki/Principal_component_analysis)
+I can't help but wonder if there's a way to reduce many of the influence functions
+to a few variables, or if some penalization methods would be required in the 
+case of constructing *many* influence functions
+
+3. As I mentioned earlier, it isn't clear how we choose which variables should
+be regressed upon the influence function set-up. Why impute histology as opposed
+to tumor stage? Is it because it's the most strongly associated with the 
+outcome? How is someone supposed to know this in practice or *a priori*?
+
+Overall I'm glad that Lumley included this subject in his book as its very 
+important but there were a lot of questions I feel still needed answering in 
+this last section.
+
+
+## Questions
+
+1.  Suppose a phase one simple random sample of size $n$ is taken from a 
+population of size $N$, to measure a variable $X$ with $G$ categories. Write 
+$N_1, N_2, ..., N_G$ for the (unknown) number of individual in the population in
+each category, and $n_1,...,n_g$ for the number in the phase one sample. The 
+phase-two sample takes a fixed number $m$ from each category. Show that 
+$\pi_i^*$, $\pi_{ij}^*$ for this design approach $\pi_i$ and $\pi_{ij}$ for a
+stratified sample from the population as $n$ increases.
+
+
+2. Construct a full two-phase data set for the Ille-et Vilaine case-control 
+study.The additional phase-one observations are 430000-975 controls to make the
+number up to the population size. Fit the logistic regression model using the
+design produced by `twophase()` and compare the results to the weighted 
+estimates in Figure 8.1.
+
+3. This exercise uses the WA State crime data for 2004 as the population. The 
+data consist of crime rates and population size for the police districts and
+sheriffs offices grouped by county.
+
+  * Take a simple random sample of 20 police districts from the state and use
+  all the data from the sampled counties. Estimate the total number of murders
+  and burglaries in the state
+  * Calibrate the sample in the previous question using population as the 
+  auxiliary variable and estimate the total number of murders and burglaries in 
+  the state.
+  * Take a simple random sample of 100 police districts as phase one of a two
+  phase design, and assume that population is the only variable available at
+  phase one. Divide the sample into 10 strata with roughly equal total 
+  population and sample two police districts from each stratum for phase two.
+  Estimate the total number of murders and of burglaries in the state.
+  * Calibrate the two phase sample using the phase-one population size data.
+  Estimate the total number of murders and of burglaries in the state.
+  
+4. The sampling probabilities $\pi$ and $\pi^*$ in the NWTS two phase 
+case-control study depend on the 2 x 2 table of relaps and instit. Suppose that 
+the superpopulation probabilities for the cells in the 2 x 2 table match those
+in Table 8.3.
+
+ * Write R code to simulate realizations of Table 8.3 and to compute the second
+ phase sampling probabilities $\pi_{i(2|1)}$ for a two-phase design with sample
+ size 1300 and cell counts as equal as possible. That is, sample everyone in a 
+ cell that has fewer than 1300 people and then divide the remaining sample size 
+ evenly over the remaining cells.
+ * Run 1000 simulations, compute $\pi_i$ as the average of $\pi_i^*$ for a given
+ cell over the simulations, and compare $\pi_i$ to the distribution of 
+ $\pi_i^*$.
+
+5. This exercise uses the WA state crime data for 2004 as the population and the
+data for 2003 as the auxiliary variables.
+
+  *  Take a simple random sample of 20 police districts from the state and use 
+  all the data from the sampled counties. Estimate teh ratio of violent crimes
+  to property crimes.
+  
+  * Calibrate the sample in the previous question using population and number of
+  burglaries as the auxiliary variables, and estimate the ratio of violent 
+  crimes to property crimes.
+  
+  * The ratio of violent crimes to property crimes in the state in 2003 was 
+  $21078 / 290945 = 0.0724$. Define an auxiliary variable 
+  `infl = violent - 0.0724 x property`, the influence function for the ratio,
+  and use it to calibrate to the state data. Estimate the ratio of violent
+  crimes to property crimes.
+  
+  * Take a simple random sample of 100 police districts as phase one of a 
+  two-phase design, and assume that the 2003 crime data are available at phase
+  one. Divide the sample into 10 strata with roughly equal total number of 
+  burglaries in 2003 and sample two police districts from each stratum for
+  phase two. Estimate the total number of murders, and of burglaries, in the 
+  state.
+  
+  * Calibrate the two-phase sample using the auxiliary variable `infl`. Estimate
+  the total number of murders, and of burglaries, in the state.
+  
+
+6. What would the efficiency approximation from exercise 5.8 give as the loss of
+efficiency from using weights in a case-control design?
 
 # Chapter 9: Missing Data
 
+## Item Non-Response
+
+Lumley opens this chapter by drawing a distinction between item and unit 
+non-response. *Item non-response* refers to the case in which partial data
+is available from a sampled respondent or observation, but not all. In contrast,
+*unit non-response* occurs when no data at all is available from a sampled
+respondent or unit of analysis.
 
 
 # Chapter 10: Causal Inference
