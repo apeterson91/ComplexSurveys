@@ -5306,12 +5306,12 @@ cols_to_keep <- c(
 )
 wa_crime_df_mod <- wa_crime_df %>%
   select(all_of(cols_to_keep)) %>%
-  rename_if(is.numeric,function(x) str_c(x,"_04"))
+  rename_if(is.numeric, function(x) str_c(x, "_04"))
 
 sample_design <- wa_crime_03_df %>%
   select(all_of(cols_to_keep)) %>%
-  rename_if(is.numeric,function(x) str_c(x,"_03")) %>% 
-  right_join(wa_crime_df_mod) %>% 
+  rename_if(is.numeric, function(x) str_c(x, "_03")) %>%
+  right_join(wa_crime_df_mod) %>%
   filter(
     (County %in% non_king_county_sample |
       Agency %in% agency_sample)
@@ -5326,13 +5326,17 @@ sample_design <- wa_crime_03_df %>%
     strata = strata_label
   )
 
-pop_03 <- wa_crime_03_df %>% summarize(P = sum(Population)) %>% pull(P)
+pop_03 <- wa_crime_03_df %>%
+  summarize(P = sum(Population)) %>%
+  pull(P)
 
 previous_year_calibration <- calibrate(sample_design,
-                                       formula = ~ burglaries_03,
-                                       population = c("(Intercept)" = pop_size,
-                                                      "burglaries_03" = pop_03)
-                                       )
+  formula = ~burglaries_03,
+  population = c(
+    "(Intercept)" = pop_size,
+    "burglaries_03" = pop_03
+  )
+)
 svytotal(~burglaries_04, previous_year_calibration)
 ```
 
@@ -5346,16 +5350,18 @@ number of burglaries.
 
 
 ```{r q7_1d}
-strata_design %>% 
+strata_design %>%
   summarize(
     ratio = survey_ratio(violent_crime, property_crime)
   )
 ```
 
 ```{r q7_1d_, eval = FALSE}
-svyratio(numerator = ~violent_crime_04, 
-         denominator = ~property_crime_04,
-         design = previous_year_calibration)
+svyratio(
+  numerator = ~violent_crime_04,
+  denominator = ~property_crime_04,
+  design = previous_year_calibration
+)
 ```
 
 Again, the sample based estimator makes sense here, while the calibrated 
@@ -5373,7 +5379,7 @@ usually further from the truth than the ratio estimator.
 BasuHTE <- function(elephant_weights) {
   N <- length(elephant_weights)
   sambo <- which.min(abs(elephant_weights - mean(elephant_weights)))
-  sample_probs <- rep((1-0.99) / (N-1), N)
+  sample_probs <- rep((1 - 0.99) / (N - 1), N)
   sample_probs[sambo] <- 0.99
   # Okay to use the base R sample implementation here because we're only
   # sampling 1 item.
@@ -5382,34 +5388,36 @@ BasuHTE <- function(elephant_weights) {
   ratio_estimate <- N * elephant_weights[x_ix]
   return(c("hte" = hte_weight, "ratio" = ratio_estimate))
 }
-elephant_is_male<- rbinom(50, size = 1, prob = 0.5)
+elephant_is_male <- rbinom(50, size = 1, prob = 0.5)
 elephant_weights <- elephant_is_male * rnorm(50, mean = 1.3E4, sd = 2E3) +
   (1 - elephant_is_male) * rnorm(50, mean = 6.6E3, sd = 1E3)
-results <- as_tibble(t(replicate(1000, BasuHTE(elephant_weights)))) %>% 
-  mutate(rep_ix = 1:n()) %>% 
-  gather(hte,ratio,key="estimator",value="estimate") %>% 
-  group_by(estimator) %>% 
-  mutate(mean = mean(estimate), sd = sd(estimate)) %>% 
+results <- as_tibble(t(replicate(1000, BasuHTE(elephant_weights)))) %>%
+  mutate(rep_ix = 1:n()) %>%
+  gather(hte, ratio, key = "estimator", value = "estimate") %>%
+  group_by(estimator) %>%
+  mutate(mean = mean(estimate), sd = sd(estimate)) %>%
   ungroup()
 ```
 
 ```{r q7_2_results}
 true_total <- sum(elephant_weights)
-results %>% 
+results %>%
   ggplot(aes(x = estimate, fill = estimator)) +
   geom_histogram() +
-  geom_vline(aes(xintercept = mean, color = estimator)) + 
+  geom_vline(aes(xintercept = mean, color = estimator)) +
   geom_vline(aes(xintercept = true_total), linetype = 2, color = "red") +
   facet_wrap(~estimator, nrow = 2) +
   ggtitle("Illustrating Basu's Elephants")
 ```
 
 ```{r q7_2_unbiased}
-results %>% 
-  filter(estimator == "hte") %>% 
-  summarize(average_estimate = mean(estimate)) %>% 
-  mutate(bias = average_estimate - true_total,
-         truth = true_total)
+results %>%
+  filter(estimator == "hte") %>%
+  summarize(average_estimate = mean(estimate)) %>%
+  mutate(
+    bias = average_estimate - true_total,
+    truth = true_total
+  )
 ```
 
 From the plot above we can see that the horvitz thompson estimator is more
@@ -5428,24 +5436,26 @@ RankedSetSampleComparison <- function(elephant_weights) {
   srs_total <- sum(srs_sample * length(elephant_weights) / 3)
   rs_sample_one <- sample(elephant_weights, size = 3)
   rs_sample_two <- sample(elephant_weights, size = 3)
-  rs_sample_three <- sample(elephant_weights, size = 3) 
-  rs_total <- rs_sample_one[which.min(rank(rs_sample_one))] * sampling_weight + 
-  rs_sample_two[which(rank(rs_sample_two) == 2)] * sampling_weight + 
+  rs_sample_three <- sample(elephant_weights, size = 3)
+  rs_total <- rs_sample_one[which.min(rank(rs_sample_one))] * sampling_weight +
+    rs_sample_two[which(rank(rs_sample_two) == 2)] * sampling_weight +
     rs_sample_three[which.max(rank(rs_sample_three))] * sampling_weight
-  return(c("Ranked Set Estimate" = rs_total, "SRS Total"= srs_total))
+  return(c("Ranked Set Estimate" = rs_total, "SRS Total" = srs_total))
 }
-results <- as_tibble(t(replicate(1000,
-                                 RankedSetSampleComparison(elephant_weights)))) %>% 
-  mutate(rep_ix = 1:n()) %>% 
-  gather(everything(), -rep_ix, key = "estimator", value = "estimate") %>% 
-  group_by(estimator) %>% 
+results <- as_tibble(t(replicate(
+  1000,
+  RankedSetSampleComparison(elephant_weights)
+))) %>%
+  mutate(rep_ix = 1:n()) %>%
+  gather(everything(), -rep_ix, key = "estimator", value = "estimate") %>%
+  group_by(estimator) %>%
   mutate(mean = mean(estimate), sd = sd(estimate))
 ```
 
 ```{r}
-results %>% 
-  ggplot(aes(x = estimate, fill = estimator)) + 
-  geom_histogram() + 
+results %>%
+  ggplot(aes(x = estimate, fill = estimator)) +
+  geom_histogram() +
   geom_vline(aes(xintercept = true_total), linetype = 2) +
   ggtitle("Ranked Set and Simple Random Sample Estimator Comparison")
 ```
@@ -5462,8 +5472,9 @@ between the states are explained by differences in age distribution.
 
 ```{r q7_4}
 db <- DBI::dbConnect(RSQLite::SQLite(), "Data/BRFSS/brfss07.db")
-brfss_ca <- tbl(db,sql("SELECT * FROM brfss")) %>% filter(X_STATE == 6) %>% 
-  collect() %>% 
+brfss_ca <- tbl(db, sql("SELECT * FROM brfss")) %>%
+  filter(X_STATE == 6) %>%
+  collect() %>%
   mutate(
     BMI_Cat = case_when(
       X_BMI4CAT == 1 ~ "Normal BMI",
@@ -5471,22 +5482,22 @@ brfss_ca <- tbl(db,sql("SELECT * FROM brfss")) %>% filter(X_STATE == 6) %>%
       X_BMI4CAT == 3 ~ "Obese BMI",
       TRUE ~ NA
     )
-  ) %>% 
+  ) %>%
   as_survey_design(
     id = X_PSU, strata = X_STATE, weight = X_FINALWT,
     nest = TRUE
   )
 
-brfss_ca %>% 
-  group_by(BMI_Cat) %>% 
+brfss_ca %>%
+  group_by(BMI_Cat) %>%
   summarize(
     proportion = survey_mean()
   )
 ```
 
 ```{r q7_4_poststratify}
-brfss_fl <- tbl(db, sql("SELECT * FROM brfss WHERE X_STATE == 12")) %>% 
-  collect() %>% 
+brfss_fl <- tbl(db, sql("SELECT * FROM brfss WHERE X_STATE == 12")) %>%
+  collect() %>%
   mutate(
     BMI_Cat = case_when(
       X_BMI4CAT == 1 ~ "Normal BMI",
@@ -5494,26 +5505,28 @@ brfss_fl <- tbl(db, sql("SELECT * FROM brfss WHERE X_STATE == 12")) %>%
       X_BMI4CAT == 3 ~ "Obese BMI",
       TRUE ~ NA
     )
-  ) %>% 
+  ) %>%
   as_survey_design(
     id = X_PSU, strata = X_STATE, weight = X_FINALWT, nest = TRUE
   )
 
-fl_sex_age_totals <- brfss_fl %>% 
-  group_by(SEX,X_AGE_G) %>%
-  survey_count() %>% 
-  select(-n_se) %>% 
+fl_sex_age_totals <- brfss_fl %>%
+  group_by(SEX, X_AGE_G) %>%
+  survey_count() %>%
+  select(-n_se) %>%
   rename(Freq = n)
 
-postStratify(design = brfss_ca, strata = ~SEX + X_AGE_G, 
-             population = fl_sex_age_totals) %>% 
+postStratify(
+  design = brfss_ca, strata = ~ SEX + X_AGE_G,
+  population = fl_sex_age_totals
+) %>%
   svymean(~BMI_Cat, design = ., na.rm = TRUE)
 ```
 
 
 ```{r q7_4_og_stratify}
-brfss_fl %>% 
-  group_by(BMI_Cat) %>% 
+brfss_fl %>%
+  group_by(BMI_Cat) %>%
   summarize(
     proportion = survey_mean()
   )
@@ -5643,12 +5656,16 @@ aggregate numbers to construct a survey design object below.
 cases <- cbind(esoph[rep(1:88, esoph$ncases), ], case = 1, weight = 1)
 controls <- cbind(esoph[rep(1:88, esoph$ncontrols), ], case = 0, weight = 441)
 esoph.x <- rbind(cases, controls)
-d_esoph <- svydesign(id = ~1, strata = ~case, weights = ~weight, 
-                     data = esoph.x)
-unwtd <- glm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp), 
-             data = esoph.x, family = binomial())
-wtd <- svyglm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp), 
-              design = d_esoph, family = quasibinomial)
+d_esoph <- svydesign(
+  id = ~1, strata = ~case, weights = ~weight,
+  data = esoph.x
+)
+unwtd <- glm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp),
+  data = esoph.x, family = binomial()
+)
+wtd <- svyglm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp),
+  design = d_esoph, family = quasibinomial
+)
 coef(unwtd)[7:8]
 coef(wtd)[7:8]
 SE(unwtd)[7:8]
@@ -5656,8 +5673,9 @@ SE(wtd)[7:8]
 ```
 
 ```{r esoph_demo_2}
-tbl_merge(tbls = list(tbl_regression(unwtd), tbl_regression(wtd)),
-          tab_spanner = c("**Unweighted**","**Weighted**")
+tbl_merge(
+  tbls = list(tbl_regression(unwtd), tbl_regression(wtd)),
+  tab_spanner = c("**Unweighted**", "**Weighted**")
 )
 ```
 
@@ -5778,33 +5796,51 @@ nwts_design
 
 ```{r nwts_ccs_demo}
 set.seed(1337)
-casectrl <- with(nwts, c(which(relaps==1), sample(which(relaps ==0), 699)))
+casectrl <- with(nwts, c(which(relaps == 1), sample(which(relaps == 0), 699)))
 nwts$in.ccs <- (1:nrow(nwts)) %in% casectrl
-ccs_design <- twophase(id = list(~1, ~1), subset = ~in.ccs,
-                       strata = list(NULL, ~ relaps), data = nwts)
-m1 <- svyglm(relaps ~ histol * stage + age + tumdiam, design = nwts_design,
-             family = quasibinomial())
-m2 <- svyglm(relaps ~ histol * stage + age + tumdiam, design = ccs_design, 
-             family = quasibinomial())
-m3 <- glm(relaps ~ histol * stage + age + tumdiam, data = nwts, subset = in.ccs,
-          family = binomial())
-m1a <- svyglm(relaps ~ histol * stage + age + tumdiam, design = nwts_design,
-              family = quasipoisson(log))
-m2a <- svyglm(relaps ~ histol * stage + age + tumdiam, design = ccs_design,
-              family = quasipoisson(log))
+ccs_design <- twophase(
+  id = list(~1, ~1), subset = ~in.ccs,
+  strata = list(NULL, ~relaps), data = nwts
+)
+m1 <- svyglm(relaps ~ histol * stage + age + tumdiam,
+  design = nwts_design,
+  family = quasibinomial()
+)
+m2 <- svyglm(relaps ~ histol * stage + age + tumdiam,
+  design = ccs_design,
+  family = quasibinomial()
+)
+m3 <- glm(relaps ~ histol * stage + age + tumdiam,
+  data = nwts, subset = in.ccs,
+  family = binomial()
+)
+m1a <- svyglm(relaps ~ histol * stage + age + tumdiam,
+  design = nwts_design,
+  family = quasipoisson(log)
+)
+m2a <- svyglm(relaps ~ histol * stage + age + tumdiam,
+  design = ccs_design,
+  family = quasipoisson(log)
+)
 ```
 
 ```{r}
-tbl_merge(tbls = list(tbl_regression(m1, conf.int = FALSE),
-                      tbl_regression(m2, conf.int = FALSE),
-                      tbl_regression(m3, conf.int = FALSE),
-                      tbl_regression(m1a, conf.int = FALSE),
-                      tbl_regression(m2a, conf.int = FALSE)),
-          tab_spanner = c("Two Phase Design based Odds Ratio",
-                          "CC Design Based Odds Ratio",
-                          "Model Based Odds Ratio",
-                          "Two Phase Design Based Relative Risk",
-                          "CC Design Based Relative Risk"))
+tbl_merge(
+  tbls = list(
+    tbl_regression(m1, conf.int = FALSE),
+    tbl_regression(m2, conf.int = FALSE),
+    tbl_regression(m3, conf.int = FALSE),
+    tbl_regression(m1a, conf.int = FALSE),
+    tbl_regression(m2a, conf.int = FALSE)
+  ),
+  tab_spanner = c(
+    "Two Phase Design based Odds Ratio",
+    "CC Design Based Odds Ratio",
+    "Model Based Odds Ratio",
+    "Two Phase Design Based Relative Risk",
+    "CC Design Based Relative Risk"
+  )
+)
 ```
 
 Few quick things to note:
@@ -5867,24 +5903,33 @@ subcohort <- with(nwts, sample(1:nrow(nwts), 750))
 cases <- which(nwts$relaps == 1)
 nwts$in.cchsample <- (1:nrow(nwts)) %in% c(subcohort, cases)
 nwts$in.subcohort <- (1:nrow(nwts)) %in% subcohort
-nwts$wts <- ifelse(nwts$in.subcohort, 3915/750, 1)
-cch_design <- twophase(id = list(~1, ~1), subset = ~in.cchsample,
-                       strata = list(NULL, ~in.subcohort),
-                       weights = list(NULL, ~wts),
-                       method = "approx",
-                       data = nwts)
+nwts$wts <- ifelse(nwts$in.subcohort, 3915 / 750, 1)
+cch_design <- twophase(
+  id = list(~1, ~1), subset = ~in.cchsample,
+  strata = list(NULL, ~in.subcohort),
+  weights = list(NULL, ~wts),
+  method = "approx",
+  data = nwts
+)
 
-s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam, 
-         design = cch_design)
+s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
+  design = cch_design
+)
 
 cch_data <- subset(nwts, in.cchsample)
 cch_data$id <- 1:nrow(cch_data)
 # "classic" analysis based only on phase 2 data
-s2 <- cch(Surv(trel, relaps) ~ histol * stage + age + tumdiam, id = ~id,
-    data = cch_data, subcoh = ~in.subcohort, cohort.size = 3915)
-tbl_merge(tbls = list(tbl_regression(s1), tbl_regression(s2)), 
-          tab_spanner = c("**Case-Cohort Analysis**", 
-                          "**Classic Phase 2 Analysis**"))
+s2 <- cch(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
+  id = ~id,
+  data = cch_data, subcoh = ~in.subcohort, cohort.size = 3915
+)
+tbl_merge(
+  tbls = list(tbl_regression(s1), tbl_regression(s2)),
+  tab_spanner = c(
+    "**Case-Cohort Analysis**",
+    "**Classic Phase 2 Analysis**"
+  )
+)
 ```
 
 Looking at the table above, we can see that there's a decent amount of 
@@ -5907,16 +5952,22 @@ first phase as opposed to the second phase for each of the estimated
 coefficients.
 
 ```{r stratified-case-cohort-sample}
-scch_design <- twophase(id = list(~1, ~1), subset = ~in.cchsample,
-                        strata = list(NULL, ~relaps), data = nwts)
+scch_design <- twophase(
+  id = list(~1, ~1), subset = ~in.cchsample,
+  strata = list(NULL, ~relaps), data = nwts
+)
 
-s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam, 
-               design = scch_design)
-nwts_design <- twophase(id = list (~1, ~1), subset = ~in.subsample, 
-                        strata = list(NULL, ~interaction(instit, relaps)), 
-                        data = nwts)
+s1 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
+  design = scch_design
+)
+nwts_design <- twophase(
+  id = list(~1, ~1), subset = ~in.subsample,
+  strata = list(NULL, ~ interaction(instit, relaps)),
+  data = nwts
+)
 s2 <- svycoxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
-               design = nwts_design)
+  design = nwts_design
+)
 
 
 v1 <- vcov(s1)
@@ -5925,20 +5976,25 @@ v2 <- vcov(s2)
 rbind(
   diag(attr(v1, "phases")$phase2 / attr(v1, "phases")$phase1),
   diag(attr(v2, "phases")$phase2 / attr(v2, "phases")$phase1)
-  )
+)
 ```
 
 
 ```{r case-cohort-comp-table}
 s3 <- coxph(Surv(trel, relaps) ~ histol * stage + age + tumdiam,
-            data = nwts)
+  data = nwts
+)
 tbl_merge(
-  tbls = list(tbl_regression(s1),
-              tbl_regression(s2),
-              tbl_regression(s3)),
-  c("**Stratified Case Cohort**",
+  tbls = list(
+    tbl_regression(s1),
+    tbl_regression(s2),
+    tbl_regression(s3)
+  ),
+  c(
+    "**Stratified Case Cohort**",
     "**Stratified Case Cohort - Institution**",
-    "**Full Data**")
+    "**Full Data**"
+  )
 )
 ```
 
@@ -6007,30 +6063,39 @@ population data to estimate the influence functions.
 
 
 ```{r influence_functions_demo}
-m0 <- svyglm(api00~ ell + mobility + emer, clus1_design)
-var_cal <- calibrate(clus1_design, formula = ~api99 + ell + mobility + emer,
-                     pop = c(6194, 3914069, 141685, 106054, 70366),
-                     bounds = c(0.1, 10)
+m0 <- svyglm(api00 ~ ell + mobility + emer, clus1_design)
+var_cal <- calibrate(clus1_design,
+  formula = ~ api99 + ell + mobility + emer,
+  pop = c(6194, 3914069, 141685, 106054, 70366),
+  bounds = c(0.1, 10)
 )
 m1 <- svyglm(api00 ~ ell + mobility + emer, design = var_cal)
 
 
-popmodel <- glm(api99 ~ ell + mobility + emer, data = apipop,
-                na.action = na.exclude)
+popmodel <- glm(api99 ~ ell + mobility + emer,
+  data = apipop,
+  na.action = na.exclude
+)
 
 inffun <- dfbeta(popmodel)
 index <- match(apiclus1$snum, apipop$snum)
-clus1if <- update(clus1_design, ifint = inffun[index, 1],
-                  ifell = inffun[index, 2], ifmobility = inffun [ index, 3], 
-                  ifemer = inffun[index, 4])
-if_cal <- calibrate(clus1if, formula = ~ifint + ifell + ifmobility + ifemer,
-                    pop = c(6194, 0, 0, 0 ,0))
+clus1if <- update(clus1_design,
+  ifint = inffun[index, 1],
+  ifell = inffun[index, 2], ifmobility = inffun[index, 3],
+  ifemer = inffun[index, 4]
+)
+if_cal <- calibrate(clus1if,
+  formula = ~ ifint + ifell + ifmobility + ifemer,
+  pop = c(6194, 0, 0, 0, 0)
+)
 
 m2 <- svyglm(api00 ~ ell + mobility + emer, design = if_cal)
 tbl_merge(
-  tbls = list(tbl_regression(m0, intercept = TRUE),
-              tbl_regression(m1, intercept = TRUE),
-              tbl_regression(m2, intercept = TRUE)),
+  tbls = list(
+    tbl_regression(m0, intercept = TRUE),
+    tbl_regression(m1, intercept = TRUE),
+    tbl_regression(m2, intercept = TRUE)
+  ),
   tab_spanner = c("Cluster Design", "Calibrated", "Influence Calibrated")
 )
 ```
@@ -6072,47 +6137,60 @@ fit the imputation model and calibrations are shown below.
 
 ```{r NWTS_inf_2phase}
 impmodel <- glm(histol ~ instit + I(age > 10) + I(stage == 4) * study,
-                data = nwts, subset = in.subsample, family = binomial())
+  data = nwts, subset = in.subsample, family = binomial()
+)
 
 nwts$imphist <- predict(impmodel, newdata = nwts, type = "response")
 
 nwts$imphist[nwts$in.subsample] <- nwts$histol[nwts$in.subsample]
 
 ifmodel <- coxph(Surv(trel, relaps) ~ imphist * age + I(stage > 2) * tumdiam,
-                 data = nwts)
+  data = nwts
+)
 
 inffun <- resid(ifmodel, "dfbeta")
 
 colnames(inffun) <- paste("if", 1:6, sep = "")
 nwts_if <- cbind(nwts, inffun)
-if_design <- twophase(id = list(~1, ~1), subset = ~in.subsample,
-                      strata = list(NULL, ~interaction(instit, relaps)),
-                      data = nwts_if)
+if_design <- twophase(
+  id = list(~1, ~1), subset = ~in.subsample,
+  strata = list(NULL, ~ interaction(instit, relaps)),
+  data = nwts_if
+)
 
-if_cal <- calibrate(if_design, phase = 2, calfun = "raking",
-                    formula = ~ if1 + if2 + if3 + if4 + if5 + if6 +
-                      relaps * instit)
+if_cal <- calibrate(if_design,
+  phase = 2, calfun = "raking",
+  formula = ~ if1 + if2 + if3 + if4 + if5 + if6 +
+    relaps * instit
+)
 
-m1 <- svycoxph(Surv(trel, relaps) ~histol * age + I(stage > 2) * tumdiam, 
-               design = nwts_design)
+m1 <- svycoxph(Surv(trel, relaps) ~ histol * age + I(stage > 2) * tumdiam,
+  design = nwts_design
+)
 
 m2 <- svycoxph(Surv(trel, relaps) ~ histol * age + I(stage > 2) * tumdiam,
-               design = if_cal)
+  design = if_cal
+)
 m3 <- coxph(Surv(trel, relaps) ~ imphist * age + I(stage > 2) * tumdiam,
-            data = nwts)
+  data = nwts
+)
 m4 <- coxph(Surv(trel, relaps) ~ histol * age + I(stage > 2) * tumdiam,
-            data = nwts)
+  data = nwts
+)
 
 tbl_merge(
-  tbls = list(tbl_regression(m1),
-              tbl_regression(m2),
-              tbl_regression(m3),
-              tbl_regression(m4)
-              ),
-  tab_spanner = c("2-Phase Weighted",
-                  "2-Phase Raked",
-                  "2 Phase Imputed",
-                  "Full Data")
+  tbls = list(
+    tbl_regression(m1),
+    tbl_regression(m2),
+    tbl_regression(m3),
+    tbl_regression(m4)
+  ),
+  tab_spanner = c(
+    "2-Phase Weighted",
+    "2-Phase Raked",
+    "2 Phase Imputed",
+    "Full Data"
+  )
 )
 ```
 
@@ -6164,6 +6242,46 @@ phase-two sample takes a fixed number $m$ from each category. Show that
 $\pi_i^*$, $\pi_{ij}^*$ for this design approach $\pi_i$ and $\pi_{ij}$ for a
 stratified sample from the population as $n$ increases.
 
+I'll start with defining the weights in stratified sample design for an 
+arbitrary strata $g$. The sampling probability $\pi_i = \frac{m}{N_g}$ and
+the co-sampling probability is $\pi_{ij} = \frac{m}{N_g}(m-1)(N_g - 1)$. 
+These values can be found from Chapter 2 question 10.
+
+From the beginning of chapter 8 we have that 
+$\pi_{i}^* = \pi_{i1} \times \pi_{i(2|1)}$ and the same is true for the 
+co-inclusion probabilities. In which case we have $\pi_{i1} = \frac{n}{N}$
+and $\pi_{i(2|1)} = \frac{m}{n_g}$. Which gives us
+$$
+\pi_{i*} = \frac{n}{N}\frac{m}{n_g}
+$$
+I'm not sure my notation is set up exactly right to answer Lumley's question
+but I can reason my way there.
+
+As $\n \to N$ we'll have more and more of the population in our first phase 
+sample or in other words the first stage sampling probability will be 1 ; 
+$\frac{N}{N} = 1$. In which case we're sampling from a strata with known strata 
+size, $N_g$ which is equivalent to the sampling probability we saw before.
+
+For the coinclusion probability we have a similar phenomenon where $n\toN$
+results in a leading factor becoming $1$.
+
+$$
+\pi_{ij,1} = \frac{n}{N}(n-1)(N-1) \\ 
+\pi_{ij,(2|1)} = \frac{m}{n_g}(m-1)(n_g-1) \\
+\implies \pi_{ij}^* = \frac{n}{N}(n-1)(N-1)\frac{m}{n_g}(m-1)(n_g-1)
+$$
+
+As $n \to N$ we have 
+$$
+\pi_{ij}^* \stackrel{n\to N}{=} 1 \times (N-1)^2 \frac{m}{N_g}(m-1)(N_g - 1) \\
+= \frac{m}{N_g}(m-1)(N_g - 1) (N - 1)^2
+$$
+which is the same except for the $(N-1)^2$ constant. I'm wondering if this
+sampling probability assumes sampling with replacement... otherwise the 
+conclusion probability should simplify --- easily --- to 1, the same as for
+$\pi_i$, the only way you'd have any probability of sampling two things together
+being more than 1, is if you were sampling with replacement...
+
 
 2. Construct a full two-phase data set for the Ille-et Vilaine case-control 
 study.The additional phase-one observations are 430000-975 controls to make the
@@ -6171,27 +6289,196 @@ number up to the population size. Fit the logistic regression model using the
 design produced by `twophase()` and compare the results to the weighted 
 estimates in Figure 8.1.
 
+```{r q8_2}
+cases <- cbind(esoph[rep(1:88, esoph$ncases), ], case = 1, weight = 1)
+controls <- cbind(esoph[rep(1:88, esoph$ncontrols * 441), ], case = 0, weight = 1)
+esoph_full <- rbind(cases, controls) %>%
+  mutate(
+    ix = 1:n(),
+    in_second_phase = if_else(case == 1 | case == 0 & ix %% 441 == 1, TRUE,
+      FALSE
+    )
+  )
+
+twop_design <- twophase(list(~1, ~1),
+  strata = list(NULL, ~case),
+  subset = ~in_second_phase,
+  data = esoph_full
+)
+
+fit <- svyglm(case ~ agegp + as.numeric(tobgp) + as.numeric(alcgp),
+  design = twop_design, family = quasibinomial()
+)
+
+tbl_merge(
+  tbls = list(
+    tbl_regression(unwtd), tbl_regression(wtd),
+    tbl_regression(fit)
+  ),
+  tab_spanner = c("**Unweighted**", "**Weighted**", "**Two Phase**")
+)
+```
+
+We can see from the table above that the two phase and weighted results are
+effectively the same. This makes sense, given the large size of the phase one
+sample.
+
 3. This exercise uses the WA State crime data for 2004 as the population. The 
 data consist of crime rates and population size for the police districts and
 sheriffs offices grouped by county.
 
+```{r q83_data}
+wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx",
+  skip = 4
+) %>%
+  filter(Year == "2004", Population > 0) %>%
+  mutate(
+    murder = `Murder Total`,
+    murder_and_crime = `Murder Total` + `Burglary Total`,
+    violent_crime = `Violent Crime Total`,
+    burglaries = `Burglary Total`,
+    property_crime = `Property Crime Total`,
+    state_pop = sum(Population),
+    County = stringr::str_to_lower(County),
+    num_counties = n_distinct(County),
+  ) %>%
+  group_by(County) %>%
+  mutate(num_agencies = n_distinct(Agency)) %>%
+  ungroup() %>%
+  select(
+    County, Agency, Population, murder_and_crime, murder, violent_crime,
+    property_crime, burglaries, num_counties, num_agencies
+  )
+```
+
   * Take a simple random sample of 20 police districts from the state and use
   all the data from the sampled counties. Estimate the total number of murders
   and burglaries in the state
+  
+Not clear what Lumley means here, given that he first says to sample at the 
+police district level but then says to use all the data at the county level...
+
+Given this mix up I proceed assuming he meant that we should sample at the
+county level and then use all the data for those counties.
+
+```{r q8_3_a}
+set.seed(35315)
+county_sample <- wa_crime_df %>%
+  distinct(County) %>%
+  slice_sample(n = 20) %>%
+  pull(County)
+
+wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  ) %>%
+  summarize(
+    total = survey_total(murder_and_crime, vartype = "ci", deff = TRUE)
+  )
+```
+
   * Calibrate the sample in the previous question using population as the 
   auxiliary variable and estimate the total number of murders and burglaries in 
   the state.
+  
+```{r q8_3_b}
+srs_design <- wa_crime_df %>%
+  filter(County %in% county_sample) %>%
+  as_survey_design(
+    ids = c(County, Agency),
+    fpc = c(num_counties, num_agencies)
+  )
+
+calibrated_srs_design <- calibrate(srs_design,
+  formula = ~1,
+  population = sum(wa_crime_df$Population)
+)
+
+svytotal(~murder_and_crime, calibrated_srs_design)
+```
+
+My use of the `calibrate()` function continues to spit out ridiculous numbers.
+I'll try to debug this later but for now all I can say is that my cursory look
+through the documentation for the function doesn't show any egregious misuse.
+  
   * Take a simple random sample of 100 police districts as phase one of a two
   phase design, and assume that population is the only variable available at
   phase one. Divide the sample into 10 strata with roughly equal total 
   population and sample two police districts from each stratum for phase two.
   Estimate the total number of murders and of burglaries in the state.
+  
+```{r q8_3_c}
+set.seed(33531)
+p1_sample <- wa_crime_df %>%
+  distinct(Agency) %>%
+  slice_sample(n = 100) %>%
+  pull(Agency)
+
+p1_pop <- wa_crime_df %>%
+  filter(Agency %in% p1_sample) %>%
+  pull(Population)
+p1_pop_quantiles <- quantile(p1_pop, seq(from = 0, to = 1, length.out = 10))
+
+p2_sample <- wa_crime_df %>%
+  filter(Agency %in% p1_sample) %>%
+  mutate(strata = cut(Population,
+    breaks = p1_pop_quantiles,
+    include.lowest = TRUE
+  )) %>%
+  select(Agency, strata) %>%
+  group_by(strata) %>%
+  slice_sample(n = 2) %>%
+  ungroup() %>%
+  pull(Agency)
+
+twop_design <- wa_crime_df %>%
+  filter(Agency %in% p1_sample) %>%
+  mutate(
+    strata = cut(Population, breaks = p1_pop_quantiles, include.lowest = TRUE),
+    in_phase_two = Agency %in% p2_sample,
+    fpc_one = 234,
+  ) %>%
+  group_by(strata) %>%
+  mutate(fpc_two = n()) %>%
+  ungroup() %>%
+  as_survey_twophase(
+    id = list(Agency, Agency),
+    strata = list(NULL, strata),
+    subset = in_phase_two,
+    fpc = list(fpc_one, fpc_two)
+  )
+
+twop_design %>%
+  summarize(
+    total = survey_total(murder_and_crime, deff = TRUE)
+  )
+```
+
+We see a much lower uncertainty around the total estimate of the number of
+murders and crimes relative to the previous design. This is especially
+exemplified in the design effect.
+  
   * Calibrate the two phase sample using the phase-one population size data.
   Estimate the total number of murders and of burglaries in the state.
+
+```{r q8_3_d}
+twop_calibration <- calibrate(twop_design, ~Population,
+  phase = "2"
+)
+svytotal(~murder_and_crime, twop_calibration, deff = TRUE)
+```
+
+Here at least the number makes sense, though it looks like the standard error
+has increased relative to the standard two phase design. This might be because
+the population information is already encoded in the strata design of the 
+second phase of sampling.
+
   
 4. The sampling probabilities $\pi$ and $\pi^*$ in the NWTS two phase 
 case-control study depend on the 2 x 2 table of relaps and instit. Suppose that 
-the superpopulation probabilities for the cells in the 2 x 2 table match those
+the super population probabilities for the cells in the 2 x 2 table match those
 in Table 8.3.
 
  * Write R code to simulate realizations of Table 8.3 and to compute the second
@@ -6199,26 +6486,155 @@ in Table 8.3.
  size 1300 and cell counts as equal as possible. That is, sample everyone in a 
  cell that has fewer than 1300 people and then divide the remaining sample size 
  evenly over the remaining cells.
+ 
+I see a lot of ways to conduct the second phase sampling that could be 
+influential on the results. For example, do we try to ensure that the cell
+counts are as equal as possible, even at the expense of throwing away sample 
+size? Or should we take as many samples as we can get even if it results in
+more unequal cell counts.
+ 
+```{r 8q4_a}
+probs <- c(
+  "Relapse_Unfav" = 194 / 3915, "Relapse_Fav" = 475 / 3915,
+  "Control_Unfav" = 245 / 3915, "Control_Fav" = 3001 / 3915
+)
+probs_df <- as_tibble(t(probs)) %>%
+  gather(everything(), key = "Cell", value = "pi_one")
+sims <- t(rmultinom(1000, size = 3915, prob = probs)) %>%
+  as_tibble() %>%
+  mutate(sim_ix = 1:n()) %>%
+  gather(everything(), -sim_ix, key = "Cell", value = "Count") %>%
+  arrange(sim_ix, Count) %>%
+  group_by(sim_ix) %>%
+  mutate(
+    cell_rank = min_rank(Count),
+    initial_sample = sum((cell_rank == 1) * Count),
+    remaining_sample = (1300 - initial_sample) / 3,
+    twop_sampling_probability = case_when(
+      # sample everything from smallest cell with probability 1
+      cell_rank == 1 ~ 1,
+      remaining_sample > Count ~ 1,
+      remaining_sample < Count ~ remaining_sample / Count
+    )
+  ) %>%
+  left_join(probs_df) %>%
+  mutate(pi_star = pi_one * twop_sampling_probability)
+```
+ 
+ 
  * Run 1000 simulations, compute $\pi_i$ as the average of $\pi_i^*$ for a given
  cell over the simulations, and compare $\pi_i$ to the distribution of 
  $\pi_i^*$.
+ 
+```{r 8q4_b}
+pi_i <- sims %>%
+  group_by(Cell) %>%
+  summarize(mean_p = mean(pi_star))
+sims %>%
+  ggplot(aes(x = pi_star, fill = Cell)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = pi_i$mean_p[1]), linetype = 2, color = "red") +
+  geom_vline(aes(xintercept = pi_i$mean_p[2]), linetype = 2, color = "red") +
+  geom_vline(aes(xintercept = pi_i$mean_p[3]), linetype = 2, color = "black") +
+  geom_vline(aes(xintercept = pi_i$mean_p[4]), linetype = 2, color = "red") +
+  ggtitle("Distribution of Product Probabilities",
+    subtitle = "Dotted Lines Indicate Average of Cell Distribution"
+  )
+```
+
+As constructed, the $\pi_i$ are the average of the $\pi_i^*$ so, naturally, 
+these appear in the center of the distributions. What is perhaps more relieving
+is that the distributions either have low variance, when they have small 
+probabilities of occurring, or are nicely normally distributed when they are,
+which, again, makes sense.
 
 5. This exercise uses the WA state crime data for 2004 as the population and the
 data for 2003 as the auxiliary variables.
 
   *  Take a simple random sample of 20 police districts from the state and use 
-  all the data from the sampled counties. Estimate teh ratio of violent crimes
+  all the data from the sampled counties. Estimate the ratio of violent crimes
   to property crimes.
+  
+```{r 8q5_a}
+wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx",
+  skip = 4
+) %>%
+  filter(Year %in% c("2003", "2004"), Population > 0) %>%
+  mutate(
+    murder = `Murder Total`,
+    murder_and_crime = `Murder Total` + `Burglary Total`,
+    violent_crime = `Violent Crime Total`,
+    burglaries = `Burglary Total`,
+    property_crime = `Property Crime Total`,
+    state_pop = sum(Population),
+    County = stringr::str_to_lower(County),
+    num_counties = n_distinct(County),
+  ) %>%
+  group_by(County) %>%
+  mutate(num_agencies = n_distinct(Agency)) %>%
+  ungroup() %>%
+  select(
+    Year, County, Agency, Population, murder_and_crime, murder, violent_crime,
+    property_crime, burglaries, num_counties, num_agencies
+  )
+
+district_sample <- wa_crime_df %>%
+  filter(Year == "2004") %>%
+  distinct(Agency) %>%
+  slice_sample(n = 20) %>%
+  pull(Agency)
+
+srs_design <- wa_crime_df %>%
+  filter(Year == "2004") %>%
+  mutate(fpc = n_distinct(Agency)) %>%
+  filter(Agency %in% district_sample) %>%
+  select(Year, County, Agency, Population, violent_crime, property_crime, fpc) %>%
+  left_join(wa_crime_df %>% filter(Year == "2003") %>%
+    select(County, Agency, burglaries, Population) %>%
+    rename_if(is.numeric, function(x) str_c(x, "_2003"))) %>%
+  as_survey_design(
+    ids = "Agency",
+    fpc = fpc
+  )
+
+srs_design %>%
+  summarize(
+    survey_ratio(violent_crime, property_crime)
+  )
+```
   
   * Calibrate the sample in the previous question using population and number of
   burglaries as the auxiliary variables, and estimate the ratio of violent 
   crimes to property crimes.
+  
+```{r 8q5_b}
+srs_calibration <- calibrate(srs_design, ~ burglaries_2003 + ~Population_2003,
+  population = 1
+)
+svyratio(~violent_crime, ~property_crime, srs_calibration)
+```
+
+Our point estimate has moved closer to the population ratio, but the variance
+has increased.
   
   * The ratio of violent crimes to property crimes in the state in 2003 was 
   $21078 / 290945 = 0.0724$. Define an auxiliary variable 
   `infl = violent - 0.0724 x property`, the influence function for the ratio,
   and use it to calibrate to the state data. Estimate the ratio of violent
   crimes to property crimes.
+  
+```{r 8q5_c}
+srs_design <- update(srs_design,
+  infl = violent_crime - 0.0724 * property_crime
+)
+srs_calibration <- calibrate(srs_design, ~infl,
+  population = 1
+)
+svyratio(~violent_crime, ~property_crime, srs_calibration)
+```
+
+Now we see a pretty much spot on estimate and the lowest standard error of them
+all.
   
   * Take a simple random sample of 100 police districts as phase one of a 
   two-phase design, and assume that the 2003 crime data are available at phase
@@ -6227,12 +6643,98 @@ data for 2003 as the auxiliary variables.
   phase two. Estimate the total number of murders, and of burglaries, in the 
   state.
   
+```{r 8q5_d}
+set.seed(35315)
+district_sample <- wa_crime_df %>%
+  filter(Year == "2004") %>%
+  distinct(Agency) %>%
+  slice_sample(n = 100) %>%
+  pull(Agency)
+
+burglary_quantiles <- wa_crime_df %>%
+  filter(Year == "2003", Agency %in% district_sample) %>%
+  pull(burglaries) %>%
+  quantile(., seq(from = 0, to = 1, length.out = 10))
+
+second_phase_sample <- wa_crime_df %>%
+  filter(Year == "2004", Agency %in% district_sample) %>%
+  mutate(strata = cut(burglaries, burglary_quantiles,
+    include.lowest = TRUE
+  )) %>%
+  group_by(strata) %>%
+  slice_sample(n = 2) %>%
+  ungroup() %>%
+  pull(Agency)
+
+
+wa_crime_df %>%
+  filter(Year == "2004") %>%
+  mutate(
+    fpc_one = n_distinct(Agency),
+    strata = cut(burglaries, burglary_quantiles, include.lowest = TRUE)
+  ) %>%
+  filter(Agency %in% district_sample) %>%
+  mutate(
+    in_second_phase = (Agency %in% second_phase_sample),
+    fpc_two = n(),
+  ) %>%
+  as_survey_twophase(
+    id = list(Agency, Agency),
+    strata = list(NULL, strata),
+    subset = in_second_phase,
+    fpc = list(fpc_one, fpc_two)
+  ) %>%
+  summarize(
+    num_burglaries = survey_total(burglaries),
+    num_murders = survey_total(murder)
+  )
+```
+  
   * Calibrate the two-phase sample using the auxiliary variable `infl`. Estimate
   the total number of murders, and of burglaries, in the state.
   
+```{r 8q5_e}
+two_phase_crime_design <- wa_crime_df %>%
+  filter(Year == "2004") %>%
+  mutate(
+    fpc_one = n_distinct(Agency),
+    strata = cut(burglaries, burglary_quantiles, include.lowest = TRUE),
+    infl = violent_crime - 0.0724 * property_crime,
+  ) %>%
+  filter(Agency %in% district_sample) %>%
+  mutate(
+    in_second_phase = (Agency %in% second_phase_sample),
+    fpc_two = n(),
+  ) %>%
+  as_survey_twophase(
+    id = list(Agency, Agency),
+    strata = list(NULL, strata),
+    subset = in_second_phase,
+    fpc = list(fpc_one, fpc_two)
+  )
+
+total_pop <- wa_crime_df %>%
+  filter(Year == "2004") %>%
+  summarize(total_pop = sum(Population)) %>%
+  pull(total_pop)
+
+calibrate_tp_cd <- calibrate(two_phase_crime_design, ~infl,
+  population = total_pop,
+  phase = "2"
+)
+svytotal(~ burglaries + ~murder, design = calibrate_tp_cd)
+```
+
+Very different answers, I'm guessing due to my misunderstanding of the 
+`population` argument for the `calibrate()` function. Will amend ASAP.
+
 
 6. What would the efficiency approximation from exercise 5.8 give as the loss of
 efficiency from using weights in a case-control design?
+
+TODO(apeterson)
+```{r 8q6}
+```
 
 # Chapter 9: Missing Data
 
