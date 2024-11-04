@@ -19,19 +19,20 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE
 )
-library(haven)
-library(gt)
-library(tidyverse)
-library(stringr)
-library(srvyr)
-library(survey)
-library(patchwork)
-library(RSQLite)
 library(DiagrammeR)
-library(lattice)
-library(quantreg)
+library(gt)
 library(gtsummary)
+library(haven)
+library(lattice)
+library(patchwork)
+library(quantreg)
+library(RSQLite)
 library(sf)
+library(splines)
+library(srvyr)
+library(stringr)
+library(survey)
+library(tidyverse)
 theme_set(theme_bw() + theme(
   text = element_text(size = 18),
   strip.background = element_blank()
@@ -6262,18 +6263,14 @@ sample or in other words the first stage sampling probability will be 1 ;
 $\frac{N}{N} = 1$. In which case we're sampling from a strata with known strata 
 size, $N_g$ which is equivalent to the sampling probability we saw before.
 
-For the coinclusion probability we have a similar phenomenon where $n\toN$
+For the co-inclusion probability we have a similar phenomenon where $n \to N$
 results in a leading factor becoming $1$.
 
 $$
 \pi_{ij,1} = \frac{n}{N}(n-1)(N-1) \\ 
 \pi_{ij,(2|1)} = \frac{m}{n_g}(m-1)(n_g-1) \\
-\implies \pi_{ij}^* = \frac{n}{N}(n-1)(N-1)\frac{m}{n_g}(m-1)(n_g-1)
-$$
-
-As $n \to N$ we have 
-$$
-\pi_{ij}^* \stackrel{n\to N}{=} 1 \times (N-1)^2 \frac{m}{N_g}(m-1)(N_g - 1) \\
+\implies \pi_{ij}^* = \frac{n}{N}(n-1)(N-1)\frac{m}{n_g}(m-1)(n_g-1) \\
+\implies \pi_{ij}^* \stackrel{n\to N}{=} 1 \times (N-1)^2 \frac{m}{N_g}(m-1)(N_g - 1) \\
 = \frac{m}{N_g}(m-1)(N_g - 1) (N - 1)^2
 $$
 which is the same except for the $(N-1)^2$ constant. I'm wondering if this
@@ -6608,14 +6605,21 @@ srs_design %>%
   crimes to property crimes.
   
 ```{r 8q5_b}
-srs_calibration <- calibrate(srs_design, ~ burglaries_2003 + ~Population_2003,
-  population = 1
+pop_totals <- wa_crime_df %>% 
+  filter(Year == "2003") %>% 
+  summarize(
+    burglaries_2003 = sum(burglaries),
+    Population_2003 = sum(Population))
+
+srs_calibration <- calibrate(srs_design,
+                             ~ burglaries_2003 + ~Population_2003 - 1,
+  population = pop_totals
 )
 svyratio(~violent_crime, ~property_crime, srs_calibration)
 ```
 
-Our point estimate has moved closer to the population ratio, but the variance
-has increased.
+Our point estimate is about the same, but the standard 
+error has increased ever so slightly.
   
   * The ratio of violent crimes to property crimes in the state in 2003 was 
   $21078 / 290945 = 0.0724$. Define an auxiliary variable 
@@ -6627,10 +6631,19 @@ has increased.
 srs_design <- update(srs_design,
   infl = violent_crime - 0.0724 * property_crime
 )
-srs_calibration <- calibrate(srs_design, ~infl,
-  population = 1
+
+pop_total <- wa_crime_df %>% 
+  filter(Year == "2003") %>% 
+  mutate(infl = violent_crime - 0.0724 * property_crime) %>% 
+  summarize(
+    infl = sum(infl)
+  )
+
+srs_calibration <- calibrate(srs_design, ~infl -1,
+  population = pop_total
 )
 svyratio(~violent_crime, ~property_crime, srs_calibration)
+
 ```
 
 Now we see a pretty much spot on estimate and the lowest standard error of them
@@ -6652,15 +6665,15 @@ district_sample <- wa_crime_df %>%
   pull(Agency)
 
 burglary_quantiles <- wa_crime_df %>%
-  filter(Year == "2003", Agency %in% district_sample) %>%
+  filter(Year == "2003") %>%
   pull(burglaries) %>%
   quantile(., seq(from = 0, to = 1, length.out = 10))
 
 second_phase_sample <- wa_crime_df %>%
   filter(Year == "2004", Agency %in% district_sample) %>%
-  mutate(strata = cut(burglaries, burglary_quantiles,
-    include.lowest = TRUE
-  )) %>%
+  mutate(
+    strata = cut(burglaries, burglary_quantiles, include.lowest = TRUE)
+  ) %>%
   group_by(strata) %>%
   slice_sample(n = 2) %>%
   ungroup() %>%
@@ -6689,7 +6702,10 @@ wa_crime_df %>%
     num_murders = survey_total(murder)
   )
 ```
-  
+
+The results are very imprecise, especially for the number of burglaries for 
+which we're not able to compute a standard error.
+
   * Calibrate the two-phase sample using the auxiliary variable `infl`. Estimate
   the total number of murders, and of burglaries, in the state.
   
@@ -6713,20 +6729,21 @@ two_phase_crime_design <- wa_crime_df %>%
     fpc = list(fpc_one, fpc_two)
   )
 
-total_pop <- wa_crime_df %>%
+total_infl <- wa_crime_df %>%
   filter(Year == "2004") %>%
-  summarize(total_pop = sum(Population)) %>%
-  pull(total_pop)
+  summarize(infl = sum(violent_crime - 0.0724 * property_crime)) %>%
+  pull(infl)
 
-calibrate_tp_cd <- calibrate(two_phase_crime_design, ~infl,
-  population = total_pop,
+
+calibrate_tp_cd <- calibrate(two_phase_crime_design, ~infl - 1,
+  population = total_infl,
   phase = "2"
 )
 svytotal(~ burglaries + ~murder, design = calibrate_tp_cd)
 ```
 
-Very different answers, I'm guessing due to my misunderstanding of the 
-`population` argument for the `calibrate()` function. Will amend ASAP.
+
+Still highly variable answers, even with the calibration!
 
 
 6. What would the efficiency approximation from exercise 5.8 give as the loss of
@@ -6746,6 +6763,140 @@ is available from a sampled respondent or observation, but not all. In contrast,
 *unit non-response* occurs when no data at all is available from a sampled
 respondent or unit of analysis.
 
+Lumley then lays out two classes of approach to handle item non-response that
+correspond to both design and modeling philosophies:
+
+1. Design ---  Frame the non-response as part of the sampling mechanism in a
+two phase design.
+
+2. Imputation --- Model the non-response as a function of other measured 
+covariates and estimate the missing values.
+
+## Two Phase Estimation for Missing Data
+
+As described above, if the pattern of missingness is relatively simple, such
+that the sample can be divided into two groups: (1) Those with complete data
+and (2) those with incomplete data, then the data can be modeled as a two
+phase sample in which the first phase individuals have incomplete data and the
+second phase have complete data. 
+
+### Calibration for item non-response
+
+Knowing the mechanism by which individuals' data went missing is typically not
+feasible but Lumley recommends starting with a simple random sample weight
+and then calibrating those weights according to other available covariates.
+
+```{r calibration_non_response}
+set.seed(31631)
+sigmoid <- binomial()$linkinv
+pmar <- with(apistrat, sigmoid(-7 + api99 / 100 - emer / 10))
+pnar <- with(apistrat, sigmoid( -7 + api00 / 100 - emer / 10))
+mar <- rbinom(nrow(apistrat), 1, pmar)
+nar <- rbinom(nrow(apistrat), 1, pnar)
+
+stratmar <- apistrat
+stratmar$api00[mar == 1] <- NA
+stratmar$w2 <- nrow(apistrat) / sum(1 - mar) ## MCAR sampling weights
+stratnar <- apistrat
+stratnar$api00[nar == 1] <- NA
+stratnar$w2 <- nrow(apistrat) / sum(1 - nar)
+
+mar_des <- twophase(id = list(~1, ~1),
+                    strata = list(~stype, ~stype),
+                    subset = ~I(!is.na(api00)),
+                    weights = list(~pw, ~w2),
+                    # difference from original code
+                    method = 'approx',
+                    data = stratmar)
+
+nar_des <- twophase(id = list(~1, ~1),
+                    strata = list(~stype, ~stype),
+                    subset = ~I(!is.na(api00)),
+                    weights = list(~pw, ~w2),
+                    method = "approx",
+                    data = stratnar)
+
+calmar1 <- calibrate(mar_des, phase = 2, calfun = "raking",
+                     ~api99 + emer + stype + enroll)
+
+calnar1 <- calibrate(nar_des, phase = 2, calfun = "raking",
+                     ~api99 + emer + stype + enroll)
+
+calmar2 <- calibrate(mar_des, phase = 2, calfun = "raking",
+                    ~ ns(api99, 3) + emer + stype + enroll)
+
+calnar2 <- calibrate(nar_des, phase = 2, calfun = "raking",
+                     ~ns(api99, 3) + emer + stype + enroll)
+
+dstrat <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = apistrat, fpc = ~fpc)
+dstrat_mar <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = stratmar, fpc = ~fpc)
+dstrat_nar <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = stratnar, fpc = ~fpc)
+
+# This is included in the book code, but I focus on the glm output
+# for ease of illustration.
+# svymean(~api99 + api00, dstrat)
+fit_full <- svyglm(api00 ~ emer + ell + meals, dstrat)
+fit_naive <- svyglm(api00 ~ emer + ell + meals, dstrat_mar)
+fit_mar1 <- svyglm(api00 ~ emer + ell + meals, calmar1)
+fit_mar2 <- svyglm(api00 ~ emer + ell + meals, calmar2)
+fit_naive_n <- svyglm(api00 ~ emer + ell + meals, dstrat_nar)
+fit_nar1 <- svyglm(api00 ~ emer + ell + meals, calnar1)
+fit_nar2 <- svyglm(api00 ~ emer + ell + meals, calnar2)
+tbl_merge(
+  tbls = list(
+    tbl_regression(fit_full, conf.int = FALSE),
+    tbl_regression(fit_naive, conf.int = FALSE),
+    tbl_regression(fit_mar1, conf.int = FALSE),
+    tbl_regression(fit_mar2, conf.int = FALSE),
+    tbl_regression(fit_naive_n, conf.int = FALSE),
+    tbl_regression(fit_nar1, conf.int = FALSE),
+    tbl_regression(fit_nar2, conf.int = FALSE)
+  ),
+  tab_spanner = c(
+   "**Full Data**",
+   "**Naive - MAR**",
+   "**Linear - MAR**",
+   "**NonLinear - MAR**",
+   "**Naive - NAR**",
+   "**Linear - NAR**",
+   "**NonLinear - NAR**"
+  )
+)
+```
+
+Above I show one iteration of a missing at random analysis, though in the book
+Lumley shows the % bias in a simulation study of missing data. In his analysis
+he identifies a reduction in bias from using the (linear) calibration in both
+the missing at random data and not missing at random data. The flexible
+calibration does worse, he argues, because of the low sample size.
+
+### Models for Response Probability
+
+In addition to calibrating the sampling weights in the hypothetical two-phase
+sample, we can also model the second phase conditional probabilities using a
+(e.g.) logistic regression.
+
+Lumley notes that this approach does not satisfy the same constraints that 
+calibrating does - calibration guarantees estimated totals in phase one match
+their true counterpart, while the regression guarantees the same for the 
+second phase.
+
+**Example NHANES III bone density**
+
+### Effect on Precision
+
+### Doubly Robust Estimators
+
+## Imputation of Missing Data
+
+### Describing Multiple Imputations in R
+
+### Example: NHANES Imputations
+
+## Questions
 
 # Chapter 10: Causal Inference
 
