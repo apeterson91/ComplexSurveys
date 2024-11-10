@@ -24,6 +24,7 @@ library(gt)
 library(gtsummary)
 library(haven)
 library(lattice)
+library(mitools)
 library(patchwork)
 library(quantreg)
 library(RSQLite)
@@ -6886,15 +6887,179 @@ second phase.
 
 **Example NHANES III bone density**
 
+This example looks at missing bone mineral density measurements from the NHANES
+study.
+
+```{r nhanesIII_missing_data_demo}
+sqlite <- dbDriver("SQLite")
+dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
+nhanes <- dbGetQuery(dbcon, "select SDPPSU6, WTPFQX6, SDPSTRA6,
+                     HSAGEU, HSAGEIR, DMARETHN, HSSEX, DMARETHN, DMPMETRO,
+                     DMPCREGN, BMPWTMI, BMPWTIF, BDPFNDMI, BDPFNDIF from set1")
+
+nhanes <- subset(nhanes, BDPFNDIF > 0)
+nhanes$hasbone <- 2 - nhanes$BDPFNDIF
+nhanes$age <- with(nhanes, ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR))
+nhanes <- subset(nhanes, age > 20)
+nhanes$psu <- with(nhanes, SDPPSU6 + 10 * SDPSTRA6)
+nhanes$agegp <- with(nhanes, cut(age, c(20, 40, 60 , Inf)))
+
+model <- glm(hasbone ~ (BMPWTMI + age) * 
+               (HSSEX * DMARETHN + DMPMETRO * DMPCREGN), family = binomial,
+             data = nhanes)
+nhanes$po <- mean(nhanes$hasbone)
+nhanes$pi2 <- fitted(model)
+design0 <- twophase(id = list(~psu, ~1), strata = list(~SDPSTRA6, NULL),
+                    weights = list(~WTPFQX6, ~I(1 / po)), 
+                    subset = ~I(hasbone == 1),
+                    ## necessary for updated version of survey package
+                    method = "approx",
+                    data = nhanes)
+design1 <- twophase(id = list(~psu, ~1), strata = list(~SDPSTRA6, NULL),
+                    weights = list(~WTPFQX6, ~I(1 / pi2)), 
+                    subset = ~I(hasbone == 1),
+                    ## necessary for updated version of survey package
+                    method = "approx",
+                    data = nhanes)
+
+design2 <- calibrate(design0, phase = 2, 
+                     formula = ~(BMPWTMI + age) * 
+                       (HSSEX * DMARETHN + DMPMETRO * DMPCREGN))
+dbDisconnect(dbcon)
+```
+
+
+```{r ch9_nhanes_demo_results}
+tibble(
+  design = c("Constant Non-Response Probability",
+             "Modeled Non-Response Probability",
+             "Calibrated Non-Response"),
+  estimate = c(svymean(~BDPFNDMI, design0),
+               svymean(~BDPFNDMI, design1),
+               svymean(~BDPFNDMI, design2)),
+  lower = c(confint(svymean(~BDPFNDMI, design0))[1],
+            confint(svymean(~BDPFNDMI, design1))[1],
+            confint(svymean(~BDPFNDMI, design2))[1]),
+  upper = c(confint(svymean(~BDPFNDMI, design0))[2],
+            confint(svymean(~BDPFNDMI, design1))[2],
+            confint(svymean(~BDPFNDMI, design2))[2]),
+) %>%  
+  mutate(
+    fmt_estimate = str_c(round(estimate, 3),
+                         "(", round(lower, 3),
+                         ", ", round(upper, 3),
+                         ")"),
+  ) %>% 
+  select(design, fmt_estimate) %>% 
+  spread(design,fmt_estimate) %>% 
+  gt::gt()
+```
+
+Lumley points out that the impact of modeling the non response --- a change in
+the point estimate of around .1 is larger than the standard error and so has the
+potential to impact the inference. Further, it isn't clear what kind of 
+definitive conclusion can be drawn from this adjustment but it seems *likely* 
+that those who did not respond had a lower bone mineral density than those that
+did.
+
 ### Effect on Precision
+
+In summarizing the impact of modeling or calibrating response probabilities on
+the estimate's precision Lumley makes the following categorization about those
+variables used to calibrate or model non-response:
+
+1. Associated with non-response but not with variables analyzed.
+   * Decrease precision, no impact on bias.
+2. Associated with non-response & variables being analyzed.
+   * Decrease bias, may increase or decrease precision.
+3. Associated only with variables analyzed and *not* with non-response.
+  * No impact on bias, increase precision.
 
 ### Doubly Robust Estimators
 
+Both of the previous methods that incorporated estimating the non-response
+into a two-phase sampling design hinged on getting the relationship between
+$Y$ and non-response correct:
+
+ * The two-phase estimator will be valid if the model for the response 
+probabilities correctly models everything that affects both $Y$ --- the outcome
+variable --- and non response. 
+
+ * The calibration estimator will be valid if the working model $Y$ correctly
+ models everything affects both $Y$ and non-response.
+ 
+It is also possible to separate the two models for non-response *and* the 
+variable $Y$ so that the estimator will be unbiased in large samples if 
+*either* model is correct. Further, if the calibration is correct we can
+get increased precision. This approach is called a "Double Robust Estimator".
+
 ## Imputation of Missing Data
+
+Lumley gives a brief description of imputation here which I'll only note 
+requires similar strong assumptions as the previous methods discussed --- 
+modelling the relationship between $Y$ and non-response, but has the added
+benefit of being useful for other, more general analyses, as a complete 
+dataset(s) is(are) provided instead of a single analysis' specific weights.
+
+As I alluded to above, typically multiple imputed datasets are provided
+to capture the added variability and uncertainty that the missing data adds
+to our analysis. I'll note that this was added uncertainty was also not present
+in the previous methods described earlier. Lumley cites Rubin in 
+idenifying that the variability between $m$ imputed datasets represents the 
+added variance attributable to our missing data.
+
+$$
+\hat{V}[T] = \frac{1}{m} \sum_{j=1}^{m} v_j + (\frac{m + 1}{m}) \frac{1}{m-1} \sum_{j=1}^{m} (\hat{T}_j - \bar{T})^2
+$$
 
 ### Describing Multiple Imputations in R
 
+I think the demo in the next section illustrates the point best, but the 
+general idea Lumley gets at here is that each imputed data set needs to be
+given its own design object and analysis and then a special function needs to
+be called to ensure the results are combined appropriately.
+
 ### Example: NHANES Imputations
+
+This example looks at the same bone mineral density data from NHANES as 
+used previously in this chapter, only now we use the five imputed data sets 
+provided by the CDC.
+
+```{r multiple_imputation_survey}
+impdata <- imputationList(c("set1", "set2", "set3", "set4", "set5"),
+                          dbtype = "SQLite", dbname = "Data/nhanes/imp.db")
+impdata
+```
+
+```{r imp_svydesign}
+designs <- svydesign(id = ~SDPPSU6, strat = ~SDPSTRA6,
+                     weight = ~WTPFQX6, data = impdata, nest = TRUE)
+
+designs
+```
+
+```{r imp_analysis}
+designs <- update(designs, age = ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR))
+designs <- update(designs, agegp = cut(age, c(20, 40, 60, Inf, right = FALSE)))
+res <- with(subset(designs, age >= 20),
+            svyby(~BDPFNDMI, ~agegp + HSSEX, svymean))
+summary(MIcombine(res))
+```
+
+
+```{r imp_analysis_BP}
+designs <- update(designs,
+                  systolic = (PEP6G1MI + PEP6H1MI + PEP6I1MI) / 3)
+qres <- with(subset(designs, age >= 20),
+             svyby(~systolic + TCPMI, ~agegp + HSSEX, svyquantile, 
+                   quantiles = c(0.5, 0.9), se = TRUE))
+summary(MIcombine(qres), digits = 2)
+```
+
+
+```{r imp_analysis_logistic_reg}
+
+```
 
 ## Questions
 
