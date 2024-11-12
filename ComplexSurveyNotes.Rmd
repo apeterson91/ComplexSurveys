@@ -6895,7 +6895,8 @@ sqlite <- dbDriver("SQLite")
 dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
 nhanes <- dbGetQuery(dbcon, "select SDPPSU6, WTPFQX6, SDPSTRA6,
                      HSAGEU, HSAGEIR, DMARETHN, HSSEX, DMARETHN, DMPMETRO,
-                     DMPCREGN, BMPWTMI, BMPWTIF, BDPFNDMI, BDPFNDIF from set1")
+                     DMPCREGN, BMPWTMI, BMPWTIF, BDPFNDMI, BDPFNDIF
+                     from set1")
 
 nhanes <- subset(nhanes, BDPFNDIF > 0)
 nhanes$hasbone <- 2 - nhanes$BDPFNDIF
@@ -6991,7 +6992,13 @@ variable --- and non response.
 It is also possible to separate the two models for non-response *and* the 
 variable $Y$ so that the estimator will be unbiased in large samples if 
 *either* model is correct. Further, if the calibration is correct we can
-get increased precision. This approach is called a "Double Robust Estimator".
+get increased precision. This approach is called a "Double Robust Estimator"
+and more can be found on it in [@bickel2001inference].
+
+
+I'm not entirely sure why Lumley included this section in his book as there's no
+way I see to easily construct a doubly robust estimator from his `survey` R
+package.
 
 ## Imputation of Missing Data
 
@@ -7001,11 +7008,11 @@ modelling the relationship between $Y$ and non-response, but has the added
 benefit of being useful for other, more general analyses, as a complete 
 dataset(s) is(are) provided instead of a single analysis' specific weights.
 
-As I alluded to above, typically multiple imputed datasets are provided
+As I alluded to above, typically multiple imputed data sets are provided
 to capture the added variability and uncertainty that the missing data adds
 to our analysis. I'll note that this was added uncertainty was also not present
 in the previous methods described earlier. Lumley cites Rubin in 
-idenifying that the variability between $m$ imputed datasets represents the 
+identifying that the variability between $m$ imputed data sets represents the 
 added variance attributable to our missing data.
 
 $$
@@ -7023,7 +7030,11 @@ be called to ensure the results are combined appropriately.
 
 This example looks at the same bone mineral density data from NHANES as 
 used previously in this chapter, only now we use the five imputed data sets 
-provided by the CDC.
+provided by the CDC. A description of how these imputations were created can be
+found in [@schafer2001multiple]. Recall, that creating the imputed data sets 
+requires specialized knowledge, while using them requires only a knowledge of 
+how to combine the imputed results together.
+
 
 ```{r multiple_imputation_survey}
 impdata <- imputationList(c("set1", "set2", "set3", "set4", "set5"),
@@ -7046,6 +7057,29 @@ res <- with(subset(designs, age >= 20),
 summary(MIcombine(res))
 ```
 
+The `summary(MIcombine(res))` call above uses the `mitools` R package methods 
+for combining separate imputed estimates together to produce the output we see. 
+Note in the output that the `missInfo` column describes the percentage of 
+"missing information" - roughly the between imputations variance as a fraction
+of the total variance - akin to the design effect
+
+Lumley doesn't go into the substantive meaning of the results beyond comparing
+it to a previous published analysis. Likely because these will be used in the 
+exercises at the end of the chapter.
+
+Lumley's next analysis uses replicate weights in a design-based 
+logistic regression model. Lumley notes that the replicate weights are the same
+for all imputed models and that they were constructed using "Fay's method" which
+makes better adjustments for when there are few observations present at the 
+intersection of some observed covariate. 
+
+I'm guessing that the replicate weights weren't changed as the result of the
+imputation --- if all original observations have imputed results. Still would
+be nice to have some commentary from Lumley on this point. 
+
+The code to perform the analysis is below. As before, Lumley offers no 
+commentary on the results of the analysis.
+
 
 ```{r imp_analysis_BP}
 designs <- update(designs,
@@ -7058,13 +7092,140 @@ summary(MIcombine(qres), digits = 2)
 
 
 ```{r imp_analysis_logistic_reg}
+sqlite <- dbDriver("SQLite")
+dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
+impload <- function(varlist, conn) {
+  tables <- paste("set", 1:5, sep = "")
+  vars <- paste(varlist, collapse = ",")
+  query <- paste("select",vars,"from @tab@")
+  data <- lapply(tables,
+                 function(table) dbGetQuery(conn, sub("@tab@", table, query)))
+  mitools::imputationList(data)
+}
 
+regdata <- impload(
+  c("SDPPSU6", "WTPFQX6","SDPSTRA6", "HSAGEU", "HSAGEIR", "DMARETHN",
+    "BMPWTMI", "BMPHTMI", "DMPPIRMI",
+    "HAB1MI", "HAT28MI", "HSSEX"), dbcon)
+wtnames <- paste(paste("WTPQRP", 1:52, sep = ""), collapse = ",")
+regwts <- dbGetQuery(dbcon, paste("select", wtnames, "from core"))
+designs <- svrepdesign(data = regdata, repweights = regwts,
+                       type = "Fay", rho = 0.3, weights = ~WTPFQX6, 
+                       combined = TRUE)
+dbDisconnect(dbcon)
+
+designs <- update(designs,
+                  age = ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR))
+adults <- subset(designs, age >= 20)
+adults <- update(adults,
+                 race = factor(ifelse(DMARETHN == 4, 1, DMARETHN)),
+                 bmi =  BMPWTMI / (BMPHTMI / 100)^2,
+                 poverty = DMPPIRMI <= 1,
+                 evgfp = factor(HAB1MI),
+                 activity = factor(HAT28MI, levels = c(3,1,2,-9)),
+                 agegp = cut(age, c(0, 20, 40, 60, Inf), right = FALSE)
+                 )
+adults <- update(adults,
+                 overwt = ifelse(HSSEX == 1, bmi >= 27.8, bmi >= 27.3))
+models <- with(adults,
+               svyglm(overwt ~ HSSEX + agegp + race + evgfp + activity + poverty,
+                      family = quasibinomial))
+summary(MIcombine(models), digits = 3)
 ```
 
 ## Questions
 
+1. Fit regression models to examine how self-rated general health (HAB1MI) is 
+related to age (HSAGEIR) and obesity (`bmi` as defined in Figure 9.7)
+
+  * Using the NHANES III multiply imputed data, with replicate weights.
+  
+I'll use the same `adults` object defined in the previous example since it
+has all the appropriate variables loaded.
+
+```{r q9_1_a}
+models <- with(adults,
+     svyglm(overwt ~ age, family = quasibinomial))
+
+summary(MIcombine(models), digits = 3)
+```
+
+In the above table we see a statistically significant positive relationship
+between age and obesity, even after accounting for the missing data.
+  
+  * Using just the complete data before imputation.
+  
+```{r q9_1_b}
+load('data/nhanes/nhanes3.rda')
+complete_design <- as_tibble(nhanes3) %>% 
+  mutate(
+    bmi = (BMPWTLBS * 0.454)/ (BMPHTIN * 2.54 / 100)^2,
+    overwt = if_else(HSSEX == 1, bmi >= 27.8, bmi >= 27.3),
+    age = HSAGEIR) %>% 
+  ## restrict to adults
+  filter(age > 20) %>% 
+  mutate(missing =  is.na(overwt) | is.na(age)) %>% 
+  as_survey_design(id = SDPPSU6, strata = SDPSTRA6,
+                   weights = WTPFHX6, 
+                   subset = I(!missing),
+                   nest = TRUE,
+                    data = nhanes3)
+model <- svyglm(overwt ~ age, family = quasibinomial, design = complete_design)
+summary(model)
+```
+
+Wee see a similar statistically significant relationship as before but the 
+effect is slightly attenuated.
+
+2. Repeat the logistic regression analysis in Figure 9.7 using linearization 
+instead of replicate weights.
+
+```{r q9_2}
+```
+
+3. In the NHANES III imputation data, estimate mean, median, and 90th percentile
+of systolic blood pressure and total cholesterol broken down by rural/urban
+location and region of the country.
+
+```{r q9_3}
+```
+
+4. Fit regression models to examine how self-rated general health (HAB1MI) is 
+related to obesity (`bmi` as defined in Figure 9.7)
+
+  * Using just the complete data before imputation.
+  
+```{r q9_4_a}
+```
+
+  * Calibrating on age, sex, race, urban / rural location and region of the
+  country.
+  
+```{r q9_4_b}
+```
+
+5. For the incomplete data sets defined in Figure 9.1, fit a linear model to
+predict `api00` from the other variables and impute from this regression model
+by taking the fitted value from the regression and adding a randomly selected 
+residual.
+
+   * Impute a single complete data set and do the two analyses (mean and 
+ regression model) at the end of Figure 9.1. Compare the results to the true 
+ population values.
+ 
+```{r q9_5_a}
+```
+ 
+  * Create 10 multiply imputed data sets and repeat the two analyses. Compare
+  the results to the true population values.
+
+```{r q9_5_b}
+```
+
 # Chapter 10: Causal Inference
 
+The 10th and final chapter of Lumley's book concerns itself with causal 
+inference in the context of survey data.
 
 # Session Info
 
