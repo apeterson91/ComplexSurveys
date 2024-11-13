@@ -1733,7 +1733,7 @@ design effect.
 > individuals, $m$, the design effect is
 
 $$
-DEff = 1 + (m-1)\rho,
+D_{eff} = 1 + (m-1)\rho,
 $$
 
 > where $\rho$ is the within-cluster correlation.
@@ -6897,6 +6897,7 @@ nhanes <- dbGetQuery(dbcon, "select SDPPSU6, WTPFQX6, SDPSTRA6,
                      HSAGEU, HSAGEIR, DMARETHN, HSSEX, DMARETHN, DMPMETRO,
                      DMPCREGN, BMPWTMI, BMPWTIF, BDPFNDMI, BDPFNDIF
                      from set1")
+dbDisconnect(dbcon)
 
 nhanes <- subset(nhanes, BDPFNDIF > 0)
 nhanes$hasbone <- 2 - nhanes$BDPFNDIF
@@ -6926,7 +6927,7 @@ design1 <- twophase(id = list(~psu, ~1), strata = list(~SDPSTRA6, NULL),
 design2 <- calibrate(design0, phase = 2, 
                      formula = ~(BMPWTMI + age) * 
                        (HSSEX * DMARETHN + DMPMETRO * DMPCREGN))
-dbDisconnect(dbcon)
+
 ```
 
 
@@ -7145,32 +7146,32 @@ has all the appropriate variables loaded.
 
 ```{r q9_1_a}
 models <- with(adults,
-     svyglm(overwt ~ age, family = quasibinomial))
+     svyglm(HAB1MI ~ age))
 
 summary(MIcombine(models), digits = 3)
 ```
 
 In the above table we see a statistically significant positive relationship
-between age and obesity, even after accounting for the missing data.
+between age and self-rated general health, even after accounting for the 
+missing data.
   
   * Using just the complete data before imputation.
   
 ```{r q9_1_b}
-load('data/nhanes/nhanes3.rda')
-complete_design <- as_tibble(nhanes3) %>% 
-  mutate(
-    bmi = (BMPWTLBS * 0.454)/ (BMPHTIN * 2.54 / 100)^2,
-    overwt = if_else(HSSEX == 1, bmi >= 27.8, bmi >= 27.3),
-    age = HSAGEIR) %>% 
-  ## restrict to adults
-  filter(age > 20) %>% 
-  mutate(missing =  is.na(overwt) | is.na(age)) %>% 
-  as_survey_design(id = SDPPSU6, strata = SDPSTRA6,
-                   weights = WTPFHX6, 
-                   subset = I(!missing),
-                   nest = TRUE,
-                    data = nhanes3)
-model <- svyglm(overwt ~ age, family = quasibinomial, design = complete_design)
+sqlite <- dbDriver("SQLite")
+dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
+nhanes <- dbGetQuery(dbcon, "select SDPPSU6, WTPFQX6, SDPSTRA6, BMPWTMI, 
+                     BMPHTMI, HAB1MI, HSAGEU, HSAGEIR from set1
+                     WHERE HAB1MI > 0 AND BMPWTMI > 0 AND BMPHTMI > 0")
+dbDisconnect(dbcon)
+design <- svydesign(ids = ~SDPPSU6, weights = ~WTPFQX6, strata = ~SDPSTRA6,
+          data = nhanes, nest = TRUE)
+design <- update(design,
+                 age = ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR),
+                 bmi =  BMPWTMI / (BMPHTMI / 100)^2,
+                 self_health = factor(HAB1MI))
+
+model <- svyolr(self_health ~ age, design = design, subset = age > 20)
 summary(model)
 ```
 
@@ -7181,14 +7182,56 @@ effect is slightly attenuated.
 instead of replicate weights.
 
 ```{r q9_2}
+sqlite <- dbDriver("SQLite")
+dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
+impload <- function(varlist, conn) {
+  tables <- paste("set", 1:5, sep = "")
+  vars <- paste(varlist, collapse = ",")
+  query <- paste("select",vars,"from @tab@")
+  data <- lapply(tables,
+                 function(table) dbGetQuery(conn, sub("@tab@", table, query)))
+  mitools::imputationList(data)
+}
+regdata <- impload(
+  c("SDPPSU6", "WTPFQX6","SDPSTRA6", "HSAGEU", "HSAGEIR", "DMARETHN", 
+    "DMPMETRO", "BMPWTMI", "BMPHTMI", "DMPPIRMI", "HAB1MI", 
+    "HAT28MI","BDPFNDMI",
+    "HSSEX"), dbcon)
+dbDisconnect(dbcon)
+
+designs <- svydesign(data = regdata, weights = ~WTPFQX6, 
+                     strata = ~SDPSTRA6, id = ~SDPPSU6, nest = TRUE)
+designs <- update(designs,
+                  age = ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR))
+adults <- subset(designs, age >= 20)
+adults <- update(adults,
+                 race = factor(ifelse(DMARETHN == 4, 1, DMARETHN)),
+                 bmi =  BMPWTMI / (BMPHTMI / 100)^2,
+                 poverty = DMPPIRMI <= 1,
+                 evgfp = factor(HAB1MI),
+                 activity = factor(HAT28MI, levels = c(3,1,2,-9)),
+                 agegp = cut(age, c(0, 20, 40, 60, Inf), right = FALSE)
+                 )
+adults <- update(adults,
+                 overwt = ifelse(HSSEX == 1, bmi >= 27.8, bmi >= 27.3))
+models <- with(adults,
+               svyglm(overwt ~ HSSEX + agegp + race + evgfp + activity + poverty,
+                      family = quasibinomial))
+summary(MIcombine(models), digits = 3)
 ```
+
+The results are effectively the same as before though the variances --- and 
+consequently the missing Information estimates --- have changed slightly.
 
 3. In the NHANES III imputation data, estimate mean, median, and 90th percentile
 of systolic blood pressure and total cholesterol broken down by rural/urban
 location and region of the country.
 
-```{r q9_3}
-```
+Not clear to me which variables represent Systolic blood pressure, total
+cholesterol or the rural/urban location. When I check online 
+[documentation](https://wwwn.cdc.gov/nchs/nhanes/nhanes3/default.aspx) for
+the appropriate variables, I don't see them in the data set that Lumley 
+posted on his website. Leaving this question blank for now.
 
 4. Fit regression models to examine how self-rated general health (HAB1MI) is 
 related to obesity (`bmi` as defined in Figure 9.7)
@@ -7196,13 +7239,44 @@ related to obesity (`bmi` as defined in Figure 9.7)
   * Using just the complete data before imputation.
   
 ```{r q9_4_a}
+sqlite <- dbDriver("SQLite")
+dbcon <- dbConnect(sqlite, dbname = "data/nhanes/imp.db")
+nhanes <- dbGetQuery(dbcon, "select SDPPSU6, WTPFQX6, SDPSTRA6,
+                     BMPWTMI, HSAGEU, HSAGEIR, DMARETHN, BMPHTMI, HAB1MI,
+                     DMPMETRO from set1
+                     WHERE HAB1MI >0 AND BMPWTMI > 0 AND BMPHTMI > 0")
+dbDisconnect(dbcon)
+## I use the weights as is here, but they should be adjusted to account for
+## the missingness. Not clear to me if that's part of the imputed data or not
+## but I'm following Lumley's example.
+design <- svydesign(ids = ~SDPPSU6, weights = ~WTPFQX6, strata = ~SDPSTRA6,
+          data = nhanes, nest = TRUE)
+design <- update(design,
+                 age = ifelse(HSAGEU == 1, HSAGEIR / 12, HSAGEIR),
+                 bmi =  BMPWTMI / (BMPHTMI / 100)^2,
+                 urban = factor(DMPMETRO),
+                 race = factor(ifelse(DMARETHN == 4, 1, DMARETHN)),
+                 self_health = factor(HAB1MI))
+summary(svyolr(self_health ~ bmi, design, subset = age > 20))
+```
+
+I model the self reported health outcome as an ordinal outcome, for which we
+see a positive and significant association with BMI.
+
+Looking at a plot below this relationship can roughly be seen. We also see some
+BMI values > 60 that look dubious. I'd probably want to check the imputation 
+model or the data records for these if I were working with this data more 
+seriously.
+```{r}
+svyplot(self_health ~ bmi, design)
 ```
 
   * Calibrating on age, sex, race, urban / rural location and region of the
   country.
   
-```{r q9_4_b}
-```
+  Again, I'm not sure about which of the NHANES variables correspond to race,
+  urban / rural location or region of the country. Also not clear how we should
+  get the population data for these values.
 
 5. For the incomplete data sets defined in Figure 9.1, fit a linear model to
 predict `api00` from the other variables and impute from this regression model
