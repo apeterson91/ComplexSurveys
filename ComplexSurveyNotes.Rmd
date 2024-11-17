@@ -1914,7 +1914,7 @@ samples are independent since the overall population si so big.
 Estimation would be much more complicated if the samples overlapped in some way.
 
 
-## Questions
+## Exercises
 
 1.  The web site has data files demo_x.xpt of demographic data and bpx_c.xpt of
     blood pressure data from NHANES 2003-2004. Code to load and merge these data
@@ -3055,7 +3055,7 @@ ggplot() +
   ggtitle("Insurance Coverage - from BRFSS and Fake Data")
 ```
 
-## Questions
+## Exercises
 
 1. Draw boxplots of body mass index by race/ethnicity and by sex using the 
 CHIS 2005 data introduced in Chapter 2.
@@ -3656,11 +3656,11 @@ Lumley urges caution in this regard, advising that even a small amount of bias
 introduced from not including the weights may make any potential increase in
 precision that comes from *not* using the weights as poor trade-off.
 
-## Questions
+## Exercises
 
 1. This exercise uses the WA State crime data for 2004 as the population.
 The data consists of crime rates and population sizes for the police districts
-(in cities/towns) and shefiffs' offices (in unincorporated areas), grouped by
+(in cities/towns) and sheriffs' offices (in unincorporated areas), grouped by
 county.
 
 * Take a simple random sample of ten counties from the state and use all the 
@@ -4529,7 +4529,7 @@ degrees of freedom to provide a heuristic of determining whether the full
 model fits well. I'm not fully convinced of his discussion here and there,
 again, appears to be an error in his table.
 
-## Questions
+## Exercises
 
 1. Using the same data as in Section 5.2.4, define hypertension as systolic 
 blood pressure greater than 140 mm Hg or diastolic blood pressure greater than
@@ -5232,7 +5232,7 @@ when the calibration estimates are used --- again, I'm guessing he's referring
 to the `survey` R package's implementation, though it isn't explicit. However,
 if replicate weights are available, then a full estimate is available.
 
-## Questions
+## Exercises
 
 1. Using the WA State Crime population, take a stratified random sample of five
 police districts from King County and five counties from the rest of the state.
@@ -6274,7 +6274,7 @@ important but there were a lot of questions I feel still needed answering in
 this last section.
 
 
-## Questions
+##  Exercises
 
 1.  Suppose a phase one simple random sample of size $n$ is taken from a 
 population of size $N$, to measure a variable $X$ with $G$ categories. Write 
@@ -7174,7 +7174,7 @@ models <- with(adults,
 summary(MIcombine(models), digits = 3)
 ```
 
-## Questions
+##  Exercises
 
 1. Fit regression models to examine how self-rated general health (HAB1MI) is 
 related to age (HSAGEIR) and obesity (`bmi` as defined in Figure 9.7)
