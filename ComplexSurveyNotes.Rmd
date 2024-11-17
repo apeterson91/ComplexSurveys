@@ -54,15 +54,51 @@ Lumley's material. Most of the datasets that I use throughout these notes are
 from Lumley's website for the
 [book](https://r-survey.r-forge.r-project.org/survey/).
 
+
+## How to use these notes?
+
+I'm imaging two general cases:
+
+1. I intend to use them as a quick reference on any of the code or topics that
+I may want to look up again in the future quickly. Or as a starting point for
+related work.
+
+2. If you are working through the book, you may find these notes useful to 
+double check Lumley's code or you're understanding of the principles tested in
+the exercises. 
+
+  * Note that Lumley's code was written at the time of publishing and much has
+  changed, both in the [survey package](https://isi-iass.org/home/wp-content/uploads/Survey_Statistician_2023_July_N88_019.pdf)
+  and R more generally. I try to keep this as close to his original code as
+  possible while updating when necessary. I also often show how to produce the 
+  same code using the [`srvyr` package](http://gdfe.co/srvyr/), but this is less
+  relevant for the later chapters. 
+     * I would not always use the same method if I was writing this kind of code
+     but I try to replicate his to make it easy for any reader with the book to
+     follow along.
+  
+  * My answers to the exercises are not guaranteed to be correct. I would 
+  strongly encourage you to avoid copying them if you are, for example, 
+  working through this textbook for a class.
+
+## How shouldn't I use these notes?
+
+These notes are no substitute for buying the 
+[book](https://www.amazon.com/Complex-Surveys-Guide-Analysis-Using/dp/0470284307) 
+itself. I would encourage you to buy the book if you're intent on working 
+through these notes.
+
 ## Conducting the Sampling itself
 
 It wasn't very long into reading this book that I found that weighted sampling
-in R is, unfortunately, not well set-up for complex designs. Further details are
-in [this](https://stats.stackexchange.com/q/639211/) stats exchange post. It
-would not be possible, for example, to simply use the popular `tidyverse`
-package `dplyr`'s function `slice_sample()` to draw a weighted sample from a
-population for example with appropriate inclusion probabilities. Instead a
-function from the
+in R is, unfortunately, not well set-up for complex designs.  It
+would not be possible, for example, to simply use the base R `sample` or 
+popular `tidyverse` package `dplyr`'s function `slice_sample()` to draw a 
+weighted sample from a population for example with appropriate inclusion 
+probabilities.Further details are in 
+[this](https://stats.stackexchange.com/q/639211/) stats exchange post.
+
+Instead a function from the
 [`sampling`](https://cran.r-project.org/web/packages/sampling/index.html)
 package would have to be used. I use this function below in any setting where a
 non-uniform sample with inclusion probabilities is needed.
@@ -90,8 +126,9 @@ the design or both.
 ### Horvitz Thompson Estimation
 
 The Horvitz Thompson Estimator (HTE) is the starting point for non-uniform
-random estimates. If we observe measure $X_i$ on subject $i$ of a population of
-$N$ total subjects the HTE is formulated as follows:
+random estimates. If we observe measure $X_i$ on subject $i$ drawn with 
+probability $\pi_i$ from a population of $N$ total subjects the HTE is 
+formulated as follows:
 
 $$
 HTE(X) = \sum_{i=1}^{N} \frac{1}{\pi_i}X_i, \tag{1.1}
@@ -99,7 +136,7 @@ $$
 
 which is an unbiased estimator as shown in the [Chapter 1 Appendix].
 
-The variance of this estimate is then
+The variance of this estimate is:
 
 $$
 V[HTE(X)] = \sum_{i,j} \left ( \frac{X_i X_j}{\pi_{ij}} - 
@@ -218,11 +255,13 @@ weighted_sample %>%
 We see that the weighted estimate standard error is not quite half the uniform
 estimate. Accordingly the design effect for the weighted sample is less than 1.
 
-## Questions From Chapter 1
+## Exercises
 
-1.1-1.2 Don't make sense to reproduce here.
+1. Doesn't make sense to reproduce here.
 
-1.3 Each visit to the front page of a newspaper's website has (independently) a
+2. Don't make sense to reproduce here.
+
+3. Each visit to the front page of a newspaper's website has (independently) a
 1/1000 chance of resulting in a questionnaire on voting intentions in a
 forthcoming election. Assuming that everyone who is given the questionnaire
 responds, why are the results not a probability sample of
@@ -234,18 +273,18 @@ responds, why are the results not a probability sample of
 Lumley lists 4 properties needed for a sample to be considered a probability
 sample.
 
-1.  Every individual (unit of analysis) in the population must have a non-zero
+*  (1) Every individual (unit of analysis) in the population must have a non-zero
     probability of ending up in the sample ($\pi_i>0 \forall i$)
 
-2.  $\pi_i$ must be known for every individual who does end up in the sample.
+*  (2) $\pi_i$ must be known for every individual who does end up in the sample.
 
-3.  Every pair of individuals in the sample must have a non-zero probability of
+*  (3) Every pair of individuals in the sample must have a non-zero probability of
     both ending up in the sample ($\pi_{i,j} \forall i, j$)
 
-4.  The probability $\pi_{i,j}$ must be known for every pair that does end up in
+*  (4) The probability $\pi_{i,j}$ must be known for every pair that does end up in
     the sample.
 
-1 is not guaranteed when considering voters --- there are voters who don't read
+(1) is not guaranteed when considering voters --- there are voters who don't read
 the paper who have will have $\pi_i = 0$ --- or the broader heading of "readers"
 of the newspaper - since those who only read the physical paper will have a
 \$\pi\_i = 0 \$. For "readers of the newspaper's online version" the sample
@@ -260,8 +299,8 @@ sub-population where you wanted a standard error of less than 5 percentage
 points in the estimate. You are using a sampling design that has given design
 effects of 2-3 for proportions in previous studies in similar areas.
 
--   Will you need a larger or smaller sample size than 50 for a subpopulation to
-    get the desired precision?
+-   Will you need a larger or smaller sample size than 50 for a sub-population 
+    to get the desired precision?
 
 Larger, a design effect $>1$ indicates that the variance is larger in the
 complex design with the same sample size - consequently the sample size will
@@ -1147,7 +1186,7 @@ $$
 
 where cost$_k$ is the cost of sampling for strata $k$.
 
-## Questions
+## Exercises
 
 1.You are conducting a survey of emergency preparedness at a large HMO, where
 you want to estimate what proportion of medical staff would be able to get to
@@ -1183,9 +1222,9 @@ c.) The survey was conducted with just two strata: physicians and other staff.
 The HMO has 900 physicians and 9000 other staff. You sample 450 physicians and
 450 other staff. What are the sampling probabilities in each stratum?
 
-physician strata sampling probabilities are
+Physician strata sampling probabilities are
 $\frac{n}{N_k} = \frac{450}{900} = \frac{1}{2}$, while the "other staff"
-probabilities are $\frac{450}{9000} = \frac{1}{20}$
+probabilities are $\frac{450}{9000} = \frac{1}{20}$.
 
 d.) 300 physicians and 150 other staff say they would be able to get to work
 after an earthquake. Give unbiased estimates of the proportion in each stratum
@@ -2788,9 +2827,9 @@ Turning to the shading plot, though we can now see more than just the "blob"
 in the first plot, there's still no apparent pattern between the 
 bubble size and the two variables to identify.
 
-Below, I include Lumley's "subsample" method, which draws a simple random
+Below, I include Lumley's "sub-sample" method, which draws a simple random
 sample from the target population by using the provided sampling probabilities.
-Lumley reccomends looking at 2 or three iterations of a subsample plot
+Lumley recommends looking at 2 or three iterations of a sub-sample plot
 in order to ensure that any features visualized are not "noise" from the 
 sampling process.
 
@@ -2802,6 +2841,7 @@ svyplot(BPXSAR ~ BPXDAR,
   ylab = "Systolic pressure (mmHg)"
 )
 ```
+
 #### Aggregation and smoothing
 
 While less of an issue than it was at the time of Lumley's writing, 
@@ -7287,19 +7327,428 @@ residual.
  regression model) at the end of Figure 9.1. Compare the results to the true 
  population values.
  
-```{r q9_5_a}
-```
+Its worth noting that adding the right residual involves computing the 
+standard deviation of the estimated variables. I show how to do this below.
  
+```{r q9_5_a}
+imputation_model_one <- lm(api00 ~ api99 + emer + stype, data = stratmar)
+api00_imp <- predict(imputation_model_one, newdata = stratmar[is.na(stratmar$api00),])
+X_miss <- model.matrix(~api99 + emer + stype, data = stratmar[is.na(stratmar$api00),])
+resid_std <- diag(X_miss %*% 
+                    vcov(imputation_model_one) %*% 
+                    t(X_miss))
+
+imputed_apistrat <- stratmar
+imputed_apistrat$api00_imp <- imputed_apistrat$api00
+imputed_apistrat$api00_imp[is.na(imputed_apistrat$api00)] <- api00_imp
+imputed_apistrat$pw <- apistrat$pw
+
+dstrat_mar <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = imputed_apistrat, fpc = ~fpc)
+svymean(~api00_imp, dstrat_mar)
+```
+
+For the missing at random data set, the mean estimate is very close to the 
+population value of `r round(mean(apipop$api00), 2)`. Though it is worth
+noting that the variance almost certainly underestimates the "true" variance of
+this estimator.
+
+```{r q9_5_a_2}
+imputation_model_two <- lm(api00 ~ api99 + emer + stype, data = stratnar)
+api00_imp <- predict(imputation_model_two, newdata = stratnar[is.na(stratnar$api00),])
+X_miss <- model.matrix(~api99 + emer + stype, data = stratnar[is.na(stratnar$api00),])
+resid_std <- diag(X_miss %*% 
+                    vcov(imputation_model_two) %*% 
+                    t(X_miss))
+
+imputed_apistrat <- stratnar
+imputed_apistrat$api00_imp <- imputed_apistrat$api00
+imputed_apistrat$api00_imp[is.na(imputed_apistrat$api00)] <- api00_imp + 
+  rnorm(n = length(resid_std), sd = resid_std)
+imputed_apistrat$pw <- apistrat$pw
+
+dstrat_nar <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = imputed_apistrat, fpc = ~fpc)
+svymean(~api00_imp, dstrat_nar)
+```
+
+
+Here we see a slight increase in bias (downward) from the true population value.
+Again, the variance is similar to before but certainly underestimated.
+
   * Create 10 multiply imputed data sets and repeat the two analyses. Compare
   the results to the true population values.
 
-```{r q9_5_b}
+```{r q9_5_b_1}
+MI_apistrat <- mitools::imputationList(lapply(1:10, function(ix) {
+  imputed_apistrat <- stratnar
+  imputed_apistrat$api00_imp <- imputed_apistrat$api00
+  imputed_apistrat$api00_imp[is.na(imputed_apistrat$api00)] <- api00_imp + rnorm(n = length(resid_std), sd = resid_std)
+  imputed_apistrat$pw <- apistrat$pw
+  return(imputed_apistrat)
+}))
+
+dstrat_nar_MI <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = MI_apistrat, fpc = ~fpc)
+
+summary(mitools::MIcombine(with(dstrat_nar_MI,
+     svymean(~api00_imp))))
 ```
+
+For the "Not Missing at Random" data set, we see a similar mean and standard
+error as before, which implies that the missing mechanism must not have been
+particularly impactful as determined by the imputed datasets.
+
+```{r q9_5_b_2}
+api00_imp <- predict(imputation_model_one, newdata = stratmar[is.na(stratmar$api00),])
+X_miss <- model.matrix(~api99 + emer + stype, data = stratmar[is.na(stratmar$api00),])
+resid_std <- diag(X_miss %*% 
+                    vcov(imputation_model_one) %*% 
+                    t(X_miss))
+MI_apistrat <- mitools::imputationList(lapply(1:10, function(ix) {
+  imputed_apistrat <- stratmar
+  imputed_apistrat$api00_imp <- imputed_apistrat$api00
+  imputed_apistrat$api00_imp[is.na(imputed_apistrat$api00)] <- api00_imp + rnorm(n = length(resid_std), sd = resid_std)
+  imputed_apistrat$pw <- apistrat$pw
+  return(imputed_apistrat)
+}))
+
+dstrat_mar_MI <- svydesign(id = ~1, strata = ~stype, weights = ~pw,
+                    data = MI_apistrat, fpc = ~fpc)
+
+summary(mitools::MIcombine(with(dstrat_mar_MI,
+     svymean(~api00_imp))))
+```
+
+We see a similar result as above, though again the mean estimate is slightly
+closer to the true population value. 
 
 # Chapter 10: Causal Inference
 
 The 10th and final chapter of Lumley's book concerns itself with causal 
-inference in the context of survey data.
+inference in the context of survey data. Lumley starts by identifying an 
+important link to 
+[randomized trials](https://en.wikipedia.org/wiki/Randomized_experiment), noting
+that design based inference is also called *randomization inference*. 
+
+From this point Lumley gives a brief outline of the potential outcomes framework
+also called the 
+[Rubin causal model](https://en.wikipedia.org/wiki/Rubin_causal_model). 
+
+In a conventional randomized trial sampling probabilities to one of two of the
+realized outcomes happens with equal probability, $\pi = \frac{1}{2}$ and so
+there's no need to discuss the ideas from unequal probability sampling. However,
+in an observational setting, randomization to treatments does not occur. 
+Instead, Lumley notes that similar to how missing data can be thought of as
+occuring due to some sampling mechanism, exposure can be framed similarly.
+
+Lumley gives the example of an individual in a data set having some probability
+of smoking or not smoking and the outcome of interest being the average 
+difference in some health outcome between smoking and non-smoking groups, 
+weighted by this probability. Whereas the target population previously was some 
+well defined finite set, now we're considering the target population defined by 
+the sampling probabilities to be the population of potential outcomes between 
+smoking and not smoking.
+
+As Lumley notes, we can think about how this might tell us something about the
+*causal* mechanism between smoking and a health outcome, and/or the groundwork
+for a certain type of estimator more broadly.
+
+## IPTW Estimators
+
+> The Inverse Probability of Treatment Weighted (IPTW) estimator is the analog
+for potential-outcomes inference of the Horvitz-Thompson estimator.
+
+
+### Randomized trials and calibration
+
+Similar to how a designed sample has *known* sampling probabilities a randomized
+trial does as well. Typically $\pi_{i} = \frac{1}{2}$ for assignment for each
+individual to the treatment or control group. In this case, no weighting is 
+needed at all in the estimation, since the weights are the same for each
+individual.
+
+Lumley then goes on to give a brief discussion of the relationship between
+calibration and regression when used in a randomized trial with some covariate 
+$X$ that is meaningfully associated with the outcome. A few brief notes
+here to summarize:
+
+* For a difference in means, the calibration and linear estimates are the same.
+* When estimating a hazard, log-odds, or rate ratios they are not
+  * The calibration estimator is still equivalent to the un-adjusted estimator.
+  * The regression estimator is now different. I believe it would be a 
+    conditional average treatment effect estimate.
+  * Lumley shows with simulation that the calibration estimate has higher 
+  precision then the un-adjusted estimate, and equivalently high precision to the
+  adjusted.
+  
+Personally, I'd keep in mind that the conditional/adjusted estimate may be more 
+interpretable than the un-adjusted - though the un-adjusted is often what is 
+sought after by a journal, for example. Deciding which is more useful is a 
+philosophical discussion, highly dependent on the question being asked.
+
+### Estimated Weights for IPTW
+
+Analogous to how weights (or values) had to be estimated for missing data in the
+previous chapter, sampling weights have to be estimated for observational data
+when examining the impact of an exposure on an outcome of interest.
+
+Lumley uses an example from a paper [@tager1979effect] examining the impact of
+smoking habits on pulmonary function amongst a sample of 654 childrenn from 
+Boston in the 1970's.  I can't find the data accessible through Lumley's book 
+[website](https://r-survey.r-forge.r-project.org/svybook/) but I did find the 
+data set via the 
+[`mplot` package](https://search.r-project.org/CRAN/refmans/mplot/html/fev.html).
+However, this dataset does not have the `siblings` or `family` variables that 
+Lumley uses in his analysis to adjust for the cluster sampling and family size.
+I proceed assuming a simple random sample without any cluster estimates.
+
+Lumley plots lung function (forced expiratory volume or FEV) against age and
+childrens' smoking status and identifies that although there's a naive 
+difference between smoking and non smoking children
+confounded by the fact that older children --- 
+who have higher FEV by virtue of age --- are more likely to smoke than those 
+who aren't.
+
+```{r iptw_demo_ttest}
+fev <- mplot::fev
+t.test(fev ~ smoke, data = fev)
+```
+
+```{r iptw_demo_boxplot}
+boxplot(fev ~ smoke, data = fev, horizontal = TRUE,
+        xlab = "FEV (L/S)", 
+        main = "Forced Expiratory Volume and Smoking Status for 654 children")
+```
+
+
+```{r iptw_demo_age_plot}
+as_tibble(fev) %>% 
+  mutate(smoke = factor(smoke, labels = c("Non-Smoking",
+                                          "Smoking"))) %>% 
+  ggplot(aes(x = age, y = fev, color = smoke)) +
+  geom_point() + 
+  geom_jitter() +
+  theme(legend.title = element_blank())
+```
+
+An IPTW analysis proceeds by estimating the probability of exposure --- 
+smoking in this case --- as a function of other covariates. I fit three models
+below following Lumley's example as close as I can and setting up design 
+objects with sampling probabilities equal to the estimated probability of 
+smoking or not smoking according to the model and the observed smoking status.
+
+It is worth highlighting here again, the analogy between sampling from a finite
+population of fixed individuals used in previous chapters, and how that 
+corresponds to our example here, where we're hypothetically sampling from a 
+population according to smoking status and using that to estimate the impact
+of smoking on FEV.
+
+A further point, that I brought up in the previous chapter, is that we're not
+incorporating any of our uncertainty about the probability of smoking into the
+model estimating the effect of smoking on FEV. Consequently the variance in the
+reported models is under-estimated.
+
+```{r iptw_demo_analysis}
+olderkids <- subset(fev, age > 12)
+m1 <- glm(smoke ~ age*sex, data = olderkids, family = binomial())
+m2 <- glm(smoke ~ height*sex, data = olderkids, family = binomial())
+m3 <- glm(smoke ~ age*sex + height*sex, data = olderkids, family = binomial())
+olderkids$pi1 <- ifelse(olderkids$smoke == 1, fitted(m1), 1 - fitted(m1))
+olderkids$pi2 <- ifelse(olderkids$smoke == 1, fitted(m2), 1 - fitted(m2))
+olderkids$pi3 <- ifelse(olderkids$smoke == 1, fitted(m3), 1 - fitted(m3))
+
+d1 <- svydesign(id = ~1, prob = ~pi1, data = olderkids)
+d2 <- svydesign(id = ~1, prob = ~pi2, data = olderkids)
+d3 <- svydesign(id = ~1, prob = ~pi3, data = olderkids)
+fit1 <- svyglm(fev~smoke, design = d1)
+fit2 <- svyglm(fev~smoke, design = d2)
+fit3 <- svyglm(fev~smoke, design = d3)
+
+tbl_merge(
+  tbls = list(
+    tbl_regression(fit1),
+    tbl_regression(fit2),
+    tbl_regression(fit3)
+  ),
+  tab_spanner = c("**Model 1**", "**Model 2**","**Model 3**")
+)
+```
+
+In the table above, we now see that mean FEV value is now negatively associated
+with smoking, but none of the estimates are statistically significant. 
+
+Lumley shows that there are similar results for an un-weighted analysis and 
+argues that the IPTW analysis is valuable for providing some justification for
+believing this effect more generally.
+
+### Double robustness
+
+Lumley brings up the idea of a double robust estimator again, this time 
+showing the estimates from a double robust estimation analysis whereby the 
+covariates used in the probability or propensity model are included in the 
+second stage model as well. This allows us to include even younger children
+in the final analysis and derive a similar conclusion as when they were
+excluded.
+
+```{r}
+olderkids <- subset(fev, age > 10)
+m1 <- glm(smoke ~ age*sex, data = olderkids, family = binomial())
+m2 <- glm(smoke ~ height*sex, data = olderkids, family = binomial())
+m3 <- glm(smoke ~ age*sex + height*sex, data = olderkids, family = binomial())
+olderkids$pi1 <- ifelse(olderkids$smoke == 1, fitted(m1), 1 - fitted(m1))
+olderkids$pi2 <- ifelse(olderkids$smoke == 1, fitted(m2), 1 - fitted(m2))
+olderkids$pi3 <- ifelse(olderkids$smoke == 1, fitted(m3), 1 - fitted(m3))
+fit1 <- svyglm(fev~smoke + height*sex + age*sex, design = d1)
+fit2 <- svyglm(fev~smoke + height*sex + age*sex, design = d2)
+fit3 <- svyglm(fev~smoke + height*sex + age*sex, design = d3)
+
+tbl_merge(
+  tbls = list(
+    tbl_regression(fit1),
+    tbl_regression(fit2),
+    tbl_regression(fit3)
+  ),
+  tab_spanner = c("**DR Model 1**", "**DR Model 2**","**DR Model 3**")
+)
+
+```
+
+## Marginal Structural Models
+
+Lumley begins this section with an important point:
+
+> For estimating effects of a single binary exposure there is not much to choose
+between IPTW estimators and regression estimators. Both will be valid if there 
+are no unmeasured confounders, and any measured confounder can equally well be 
+used in adjustment, in reweighting, or both. 
+
+However, when considering repeated measures over time, IPTW estimators have
+a significant advantage in modeling the relationship between outcome and
+exposure more explicitly. After all, exposure measured at time point 1 may well
+impact the outcome at *all* subsequent time points.
+
+Thankfully, using the IPTW approach, we can proceed similarly as before, 
+estimating the potential outcome for each possible exposure pathway. The 
+propensity scores or probabilities can then be multiplied to give the potential
+outcomes sequence and the sampling probability used will be for the sequence
+observed.
+
+**Example: maternal stress and children's illness**
+
+I obtained the `mscm` dataset from Lumley's 
+[website](https://r-survey.r-forge.r-project.org/svybook/), who in turn obtained
+it from Patrick Heagerty's 
+[website](https://faculty.washington.edu/heagerty/Books/AnalysisLongitudinal/)
+which includes 
+[documentation](https://faculty.washington.edu/heagerty/Books/AnalysisLongitudinal/mscm.txt)
+I would encourage looking over.
+
+This dataset comes from the The Mothers' and Children's Morbidity Study which
+examined how maternal stress might impact childhood illness. Stress and illness
+were measured for 30 days on 167 mother-child pairs on a 0-1 scale. 
+
+I reproduce Lumley's analysis in the code below examining the effect of a 
+mother's stress on her child's illness. 
+
+
+Lumley begins by filtering the data to only include mother-child pairs with
+28 non-missing observations and ~ 3 weeks of data.
+```{r msm_maternal_stress_demo}
+mscm <- read_table("data/mscm.txt",col_names = c("id","day","stress", paste("s",1:6,sep=""),
+                 "illness", paste("i",1:6,sep=""),
+                 "married","education","employed","chlth","mhlth","race",
+                 "csex","hsize","wk1illness","wk1stress"))
+mscm$nna <- with(mscm, ave(stress + illness, id, FUN = function(x) sum(!is.na(x))))
+mscm <- subset(mscm, nna == 28 & day > 6 & day < 29)
+
+```
+
+
+Lumley produces stabilized weights by averaging two model's respective 
+probabilities of stress. A model (1) that includes the child's current and previous 
+state of illness (which might cause subsequent stress on the mother's part), 
+as well as the current day in the study and baselines stress and a second (2)
+that looks only at the baseline stress and change in mother's stress over time.
+
+When Lumley talks about separating the exposure model from the outcome without
+having to worry about self-caused confounding --- child's illness inducing 
+subsequent maternal stress --- this is what he means. Using both probabilities 
+increases the variability of the weights without inducing any potential 
+confounding.
+
+The two design objects include id as the sampling unit to account for 
+within-person correlation. As a side note, I'm wondering how this approach 
+compares to, say, a GEE or linear mixed effects model's adjustment for within
+person correlation in measurement. Since we end up fitting regression models 
+that are effectively GEE models I'm guessing those are roughly equivalent.
+```{r msm_maternal_stress_eda}
+model <- glm(stress ~ illness + i1 + s1 + day + wk1stress, family = binomial(),
+             data = mscm, na.action = na.exclude)
+mscm$pstress <- fitted(model)
+basemodel <- glm(stress ~ day + wk1stress, family = binomial, 
+                 data = mscm, na.action = na.exclude)
+mscm$pbstress <- fitted(basemodel)
+mscm$swit <- with(mscm, ifelse(stress == 1, pbstress / pstress,
+                               ( 1 - pbstress) / (1-pstress)))
+mscm$swi <- with(mscm, ave(swit, id, FUN = prod))
+
+des <- svydesign(id = ~id, weights = ~swi, data = mscm)
+unwt <- svydesign(id = ~id, data = mscm)
+```
+
+
+Lumley then fits three outcome models. One uses the stabilized sampling weights,
+one uses no weights, and then a third uses no weights, but includes the 
+baseline variable adjustment. The estimates and standard errors are in the table
+below.
+```{r msm_gee}
+m_iptw <- svyglm(illness ~ s1 + s2 + s3 + s4, design = des,
+                 family = quasibinomial)
+m_raw <- svyglm(illness ~ s1 + s2 + s3 + s4, des = unwt,
+                family = quasibinomial)
+
+m_gee <- svyglm(illness ~ s1+s2+s3+s4+wk1stress+wk1illness, des = unwt,
+                family = quasibinomial)
+
+pred_data <- data.frame(s1 = 0:1, s2 = 0:1, s3 = 0:1, s4 = 0:1,
+                        wk1stress = 0.16, wk1illness = 0.16)
+
+pred_iptw <- predict(m_iptw, pred_data, vcov = TRUE, type = "response")
+pred_raw <- predict(m_raw, pred_data, vcov = TRUE, type = "response")
+pred_gee <- predict(m_gee, pred_data, vcov = TRUE, type = "response")
+
+# Here Lumley's looking at the difference in log odds of a child being ill 
+# if its mother was stressed the previous four days and had (I believe) average
+# baseline stress and illness, and if the mother did *not* stress the previous
+# four days, but still had the same baseline variables. i.e. Is the mother's
+# stress associated with a change in the odds of her child's illness.
+c_iptw <- svycontrast(pred_iptw, c(-1, 1))
+c_raw <- svycontrast(pred_raw, c(-1, 1))
+c_gee <- svycontrast(pred_gee, c(-1, 1))
+tibble(model = c("IPTW", "Unadjusted", "Baseline Adjusted"),
+       estimate = c(c_iptw, c_raw, c_gee),
+       std_err = c(attr(c_iptw,"var"), attr(c_raw,"var"),
+                   attr(c_gee,"var"))) %>% 
+  gt::gt() %>% 
+  gt::fmt_number(decimals = 3) %>% 
+  gt::tab_header("Estimate of Childhood Illness from Mother's Stress")
+```
+
+Lumley uses this data to demonstrate how the IPTW estimator is useful for 
+adjusting for all variability in the exposure -- mother's stress --- that might 
+lead to the child's illness.
+
+Unfortunately with such a small data set and a likely small effect size, we're
+not able to determine that this result is statistically different from zero.
+Lumley notes that this is often the case for methods like these, as removing
+so much confounding from observational data results in very small subsequent
+effect typically.
+
+## Exercises
+
+There are no exercises for this chapter.
+
 
 # Session Info
 
