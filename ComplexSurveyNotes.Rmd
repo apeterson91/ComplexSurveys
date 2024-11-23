@@ -19,6 +19,7 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE
 )
+library(broom)
 library(DiagrammeR)
 library(gt)
 library(gtsummary)
@@ -50,18 +51,16 @@ Guide to Analysis in R" [@lumley2011complex] and the methods underlying
 statistics more broadly. This write-up reflects my understanding of the
 material with additions made to try and clarify ideas further. These include
 simulations, derivations or references that I found helpful in working through
-Lumley's material. Most of the datasets that I use throughout these notes are
+Lumley's material. Most of the data sets that I use throughout these notes are
 from Lumley's website for the
-[book](https://r-survey.r-forge.r-project.org/survey/).
+[book](https://r-survey.r-forge.r-project.org/survey/). 
 
 
-## How to use these notes?
+### How to use these notes?
 
-I'm imaging two general cases:
+I'd imagine there are two general ways one might use these notes:
 
-1. I intend to use them as a quick reference on any of the code or topics that
-I may want to look up again in the future quickly. Or as a starting point for
-related work.
+1. As a quick reference on any of the code or topics.
 
 2. If you are working through the book, you may find these notes useful to 
 double check Lumley's code or you're understanding of the principles tested in
@@ -81,14 +80,14 @@ the exercises.
   strongly encourage you to avoid copying them if you are, for example, 
   working through this textbook for a class.
 
-## How shouldn't I use these notes?
+### How shouldn't I use these notes?
 
 These notes are no substitute for buying the 
 [book](https://www.amazon.com/Complex-Surveys-Guide-Analysis-Using/dp/0470284307) 
 itself. I would encourage you to buy the book if you're intent on working 
 through these notes.
 
-## Conducting the Sampling itself
+## Drawing Samples in R
 
 It wasn't very long into reading this book that I found that weighted sampling
 in R is, unfortunately, not well set-up for complex designs.  It
@@ -113,15 +112,15 @@ a similarly complex question which I haven't yet resolved to my satisfaction.
 
 ## Design vs. Model
 
-Key to analysis of complex surveys is the idea of studying the design from which
-the data are constructed, rather than the data itself. In a traditional survey
-setting the data are assumed to be fixed and the probabilities of sampling
-different entities are used to derive the desired estimate. These inclusion
-probabilities or their inverse, "sampling weights", are used to re-balance the
-data so that they more accurately reflect the target population distribution.
-Different sampling techniques --- clustering, 2-phase, etc. --- are used to
-either decrease the variance of the resulting estimate, the cost associated with
-the design or both.
+This book focuses on "Design-based" Inference. That is the methods in this book
+focus on the design from which the data are constructed, rather than the data 
+itself. In a traditional survey setting the data are assumed to be fixed and 
+the probabilities of sampling different entities are used to derive the desired
+estimate. These inclusion probabilities or their inverse, "sampling weights", 
+are used to re-balance the data so that they more accurately reflect the target
+population distribution. Different sampling techniques --- clustering, 2-phase, 
+etc. --- are used to either decrease the variance of the resulting estimate, 
+the cost associated with the design or both.
 
 ### Horvitz Thompson Estimation
 
@@ -246,7 +245,7 @@ uniform_sample %>%
   )
 ```
 
-```{r}
+```{r pps_demo_display}
 weighted_sample %>%
   as_survey_design(probs = pi) %>%
   summarize(mean_income = survey_mean(income, deff = TRUE))
@@ -264,7 +263,7 @@ estimate. Accordingly the design effect for the weighted sample is less than 1.
 3. Each visit to the front page of a newspaper's website has (independently) a
 1/1000 chance of resulting in a questionnaire on voting intentions in a
 forthcoming election. Assuming that everyone who is given the questionnaire
-responds, why are the results not a probability sample of
+responds, why are the results not a probability sample of:
 
 -   Voters?
 -   Readers of the newspaper?
@@ -273,127 +272,128 @@ responds, why are the results not a probability sample of
 Lumley lists 4 properties needed for a sample to be considered a probability
 sample.
 
-*  (1) Every individual (unit of analysis) in the population must have a non-zero
+*  (i) Every individual (unit of analysis) in the population must have a non-zero
     probability of ending up in the sample ($\pi_i>0 \forall i$)
 
-*  (2) $\pi_i$ must be known for every individual who does end up in the sample.
+*  (ii) $\pi_i$ must be known for every individual who does end up in the sample.
 
-*  (3) Every pair of individuals in the sample must have a non-zero probability of
+*  (iii) Every pair of individuals in the sample must have a non-zero probability of
     both ending up in the sample ($\pi_{i,j} \forall i, j$)
 
-*  (4) The probability $\pi_{i,j}$ must be known for every pair that does end up in
+*  (iv) The probability $\pi_{i,j}$ must be known for every pair that does end up in
     the sample.
 
-(1) is not guaranteed when considering voters --- there are voters who don't read
-the paper who have will have $\pi_i = 0$ --- or the broader heading of "readers"
-of the newspaper - since those who only read the physical paper will have a
-\$\pi\_i = 0 \$. For "readers of the newspaper's online version" the sample
-would only be a probability sample if the time window was further specified, as
-there could be online readers who do not visit during the survey window, and
-would thus be assigned a $\pi_i=0$.
+(i) is not guaranteed when considering voters --- there are voters who don't 
+read the paper who have will have $\pi_i = 0$ --- or the broader heading of 
+"readers" of the newspaper - since those who only read the physical paper will 
+have a \$\pi\_i = 0 \$. For "readers of the newspaper's online version" the 
+sample would only be a probability sample if the time window was further 
+specified, as there could be online readers who do not visit during the survey 
+window, and would thus be assigned a $\pi_i=0$.
 
-1.4 You are conducting a survey that will estimate the proportion of women who
+4. You are conducting a survey that will estimate the proportion of women who
 used anti-malarial insecticide-treated bed nets every night during their last
 pregnancy. With a simple random sample you would need to recruit 50 women in any
 sub-population where you wanted a standard error of less than 5 percentage
 points in the estimate. You are using a sampling design that has given design
 effects of 2-3 for proportions in previous studies in similar areas.
 
--   Will you need a larger or smaller sample size than 50 for a sub-population 
-    to get the desired precision?
+  * Will you need a larger or smaller sample size than 50 for a sub-population 
+  to get the desired precision?
 
 Larger, a design effect $>1$ indicates that the variance is larger in the
 complex design with the same sample size - consequently the sample size will
 need to be increased to maintain the same level of precision.
 
--   Approximately what sample size will you need to get the desired precision?
+  * Approximately what sample size will you need to get the desired precision?
 
 100 - 150. Derived from multiplying 50 by 2 and 3.
 
-1.5 Systematic sampling involves taking a list of the population and choosing,
+5. Systematic sampling involves taking a list of the population and choosing,
 for example, every 100th entry in the list.
 
-a)  Which of the necessary properties of a probability sample does this have?
+  * Which of the necessary properties of a probability sample does this have?
 
-Items 2-4 from the list enumerated above. The only condition that is not
+Items ii-iv from the list enumerated above. The only condition that is not
 satisfied is that not every item has a nonzero probability of being chosen.
 
-b)  For systematic sampling with a random start, the procedure would be to
+  * For systematic sampling with a random start, the procedure would be to
     choose a random starting point from 1, 2, ..., 1000 and then take every
     100th entry starting at the random point. Which of the necessary properties
     of a probability sample does this procedure have?
 
 This satisfies all items from the above list.
 
-c)  For systematic sampling with multiple random starts we might choose 5 random
+  * For systematic sampling with multiple random starts we might choose 5 random
     starting points in 1, 2, ....., 5000 and then take every 500th entry
     starting from each of the 5 random points. Which of the necessary properties
     of a probability sample does this procedure have?
 
 Again, this satisfies all items from the above list.
 
-d)  If the list were shuffled into a random order before a systematic sample was
+  * If the list were shuffled into a random order before a systematic sample was
     taken, which of the properties would the procedure have.
 
 Again, all of them. The key is adding the *known* randomness and not excluding
 any items from selection.
 
-e)  Treating a systematic sample as if it were a simple random sample often
+  * Treating a systematic sample as if it were a simple random sample often
     gives good results. Why would this be true?
 
 This would be because the items are not ordered in any particular fashion prior
 to taking the "systematic sampling". In this setting a systematic sample is
 equivalent to a simple random sample.
 
-1.6 Why must all the sampling probabilities be non-zero to get a valid
+6. Why must all the sampling probabilities be non-zero to get a valid 
 population estimate?
 
 If any of the sampling probabilities are zero, that would introduce bias in
 shifting the estimate away from the portion of the population that would
 *always* be unobserved under repeated sampling.
 
-1.7 Why must all the pairwise probabilities be non-zero to get a valid
+7. Why must all the pairwise probabilities be non-zero to get a valid
 uncertainty estimate.
 
 This is basically a second order statement equivalent to the previous. If any
 pair is unable to be observed together that is a form of selection bias that
 would shift the sample estimate away from the true population value.
 
-1.8 A probability design assumes that people who are sampled will actually be
+8. A probability design assumes that people who are sampled will actually be
 included in the sample, rather than refusing. Look up the response rates for the
 most recent year of BRFSS and NHANES.
 
 Lumley is highlighting the fact that even though we set up samples thinking
 that every sample will be observed that is rarely the case. Looking at 
-just the most recent NHANES [data](https://www.cdc.gov/nchs/hus/sources-definitions/nhanes.htm#sample-size-response-rate) I see response rates at ~ 78% for the unweighted, 6-year household survey.
+just the most recent NHANES 
+[data](https://www.cdc.gov/nchs/hus/sources-definitions/nhanes.htm#sample-size-response-rate)
+I see response rates at ~ 78% for the un-weighted, 6-year household survey.
 
-1.9 In a telephone study using random digit dialing, telephone numbers are
+9. In a telephone study using random digit dialing, telephone numbers are
 sampled with equal probability from a list. When a household is recruited, why
 is it necessary to ask how many telephones are in the household, and what should
 be done with this information in computing the weights.
 
-It is necessary to ask how many telephones are in the household to downweight
+It is necessary to ask how many telephones are in the household to down weight
 the *a priori* sampling probability accordingly because every additional
 telephone line increases the odds that a given house is sampled. For example in
 a simple population with two houses, where house one has 5 telephones and house
 two has 2 telephones, and we're looking to take a $n=1$ sample, but we don't
-know the number of telephones a priori, house one has a $\frac{5}{7}$
+know the number of telephones *a priori*, house one has a $\frac{5}{7}$
 probability of being sampled. If that is the house that is chosen its weight
 needs to go from 2 to $\frac{5}{7}$ to better reflect its sampling probability.
 In a real sample this would be corrected relative to all the other households
 number of telephones or perhaps a population average of the number of
 telephones.
 
-1.10
+10.
 
 Derive the Horvitz Thompson variance estimator for the total as follows.
 
-a)  Write $R_i = 1$ if individual $i$ is in the sample, $R_i=0$ otherwise. Show
-    that $V[R_i] = \pi_i(1-\pi_i)$ and that
-    $Cov[R_i,R_j]=\pi_{ij} - \pi_i\pi_j$.
+*  Write $R_i = 1$ if individual $i$ is in the sample, $R_i=0$ otherwise. Show 
+that $V[R_i] = \pi_i(1-\pi_i)$ and that $Cov[R_i,R_j]=\pi_{ij} - \pi_i\pi_j$.
 
 This follows in a straightforward fashion from the assumption that $R_i$ is
-distributed according to the bernoulli distribution and $R_i \perp R_j$. This is
+distributed according to the Bernoulli distribution and $R_i \perp R_j$. This is
 an accurate model for sampling with replacement, or sampling from large
 populations with small sample sizes without replacement, but less true for small
 sample sizes without replacement.
@@ -415,10 +415,11 @@ $$
 
 which is equivalent to the above, where $\check{x_i} = \frac{X_i}{\pi_i}$.
 
-c)  Show that an unbiased estimator of the variance is $$
-    \hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{N}\sum_{j=1}^{N} 
-    \frac{R_i R_j}{\pi_{ij}}\check{x_i}\check{x_j}(\pi_{ij} - \pi_i \pi_j)
-    $$
+  * Show that an unbiased estimator of the variance is 
+$$
+\hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{N}\sum_{j=1}^{N} 
+\frac{R_i R_j}{\pi_{ij}}\check{x_i}\check{x_j}(\pi_{ij} - \pi_i \pi_j)
+$$
 
 To show the expression above is unbiased for $\hat{V}[\hat{T}_{HT}]$ we must
 show that $E\left [\hat{V}[\hat{T}_{HT}] \right] = V[\hat{T}_{HT}]$ $$
@@ -443,7 +444,7 @@ $$
 
 I'm not sure how the signs switch on the last line to reproduce expression 1.2
 
-1.11 Another popular way to write the Horvitz-Thompson variance estimator is
+11. Another popular way to write the Horvitz-Thompson variance estimator is
 
 $$
 \hat{V}[\hat{T}_{HT}] = \sum_{i=1}^{n} x_i^{2} \frac{1-\pi_i}{\pi_i^2} + 
@@ -590,9 +591,11 @@ p1 + p2
 ## Complex Sample Data in R
 
 What follows is a work-up of basic survey estimates using the California API
-dataset composed of student standardized test scores. I'll work through the code
+data set composed of student standardized test scores. I'll work through the code
 once using the `survey` package and a second time using the `srvyr` package,
-which has a [tidyverse](https://www.tidyverse.org/) friendly API.
+which has a [tidyverse](https://www.tidyverse.org/) friendly API. These are all
+demonstrated alongside Lumley's commentary in the book and I'd encourage you to
+read the section for more details on this part.
 
 Much of the computational work in this book begins with creating a design
 object, from which weights and other information can then be drawn on for any
@@ -733,11 +736,13 @@ strata counts without any uncertainty.
 Several points worth noting about stratified samples before moving on.
 
 -   Stratified samples get their power from "conditioning" on the strata
-    information that explain some of the variability in the measure.
+    information that explain some of the variability in the measure --- 
+    analogous to regression estimators improved variance when conditioning on 
+    informative covariates.
 
 -   Whereas a SRS might have a chance of leaving out an elementary or middle
     school, and leaving a higher estimate of enrollment, because of a higher
-    number of highschools in the sample, keeping a fixed number of samples
+    number of high schools in the sample, keeping a fixed number of samples
     within each strata removes this problem.
 
 -   Stratified analysis may also refer to something entirely different from what
@@ -1192,9 +1197,9 @@ where cost$_k$ is the cost of sampling for strata $k$.
 you want to estimate what proportion of medical staff would be able to get to
 work after an earthquake.
 
-a.) You can either send out a single questionnaire to all staff, or send out a
-questionnaire to about 10% of the staff and make follow-up phone calls for those
-that don't respond. What are the disadvantages of each approach?
+  * You can either send out a single questionnaire to all staff, or send out a
+  questionnaire to about 10% of the staff and make follow-up phone calls for those 
+  that don't respond. What are the disadvantages of each approach?
 
 This comes down to a discussion of cost for sampling and what missing data
 mechanism may be at play. As a simple starting point, if we were to assume the
@@ -1210,15 +1215,15 @@ of certain strata --- certain physicians, technicians or other kinds of staff's
 response would likely be worth knowing yet these groups may be less well
 represented in a 10% simple random sample of the population.
 
-b.) You choose to survey just a sample. What would be useful variables to
-stratify the sampling, and why?
+  * You choose to survey just a sample. What would be useful variables to 
+  stratify the sampling, and why?
 
 The aforementioned job title would be useful to stratify on. This would likely
 be most useful to conduct within each department. Further, if the HMO has more
 than one site or clinic, that would be worth stratifying on as well for
 substantive reasons just as much as statistical reasons.
 
-c.) The survey was conducted with just two strata: physicians and other staff.
+  * The survey was conducted with just two strata: physicians and other staff.
 The HMO has 900 physicians and 9000 other staff. You sample 450 physicians and
 450 other staff. What are the sampling probabilities in each stratum?
 
@@ -1226,9 +1231,9 @@ Physician strata sampling probabilities are
 $\frac{n}{N_k} = \frac{450}{900} = \frac{1}{2}$, while the "other staff"
 probabilities are $\frac{450}{9000} = \frac{1}{20}$.
 
-d.) 300 physicians and 150 other staff say they would be able to get to work
-after an earthquake. Give unbiased estimates of the proportion in each stratum
-and the total proportion.
+  * 300 physicians and 150 other staff say they would be able to get to work 
+  after an earthquake. Give unbiased estimates of the proportion in each stratum 
+  and the total proportion.
 
 The physician strata estimate would be $\frac{300}{450} = \frac{2}{3}$. The
 staff strata would be $\frac{150}{450} = \frac{1}{3}$ The total proportion would
@@ -1250,9 +1255,9 @@ hmo_design
 svymean(~prep, hmo_design)
 ```
 
-e.) How would you explain to the managers that commissioned the study how the
-estimate was computed and why it wasn't just the number who said "yes" divided
-by the total number surveyed?
+  * How would you explain to the managers that commissioned the study how the 
+  estimate was computed and why it wasn't just the number who said "yes" divided 
+  by the total number surveyed?
 
 We sampled from the total population using the strata because we though these
 two groups would respond differently and indeed, they did. Physicians have are
@@ -1300,7 +1305,7 @@ the median school enrollment. Since this divides the population exactly in half
 the strata are equally sized and the only differentiating factor is the
 variability of the enrollment.
 
-```{r}
+```{r q2_6_1}
 as_tibble(apipop) %>%
   transmute(
     enroll = enroll,
@@ -1316,7 +1321,7 @@ from the two strata at a 5:1 ratio, respectively. Or, explicitly, we'd sample
 160 schools from the above median school size and 40 schools from the below
 median school size.
 
-```{r}
+```{r q2_6_2}
 api_opt_strat <- as_tibble(apipop) %>%
   filter(!is.na(enroll)) %>%
   transmute(
@@ -1355,9 +1360,7 @@ correlated with enrollment size.
     of size 200 from the Academic Performance Index population has close to a
     Normal distribution.
 
-<!-- -->
-
-a)  Construct similar graphs for SRS of size 200, 50, 25, 10.
+  * Construct similar graphs for SRS of size 200, 50, 25, 10.
 
 I've already done something like this at the start of the chapter. We'd expect
 the central limit theorem (the normality of the sample means) to be better for
@@ -1365,7 +1368,7 @@ the larger sample sizes listed. Or rather, we might not trust the standard error
 for the sample size of 10 to really represent the variability of the sample
 mean.
 
-b)  Repeat for median school size.
+  * Repeat for median school size.
 
 ```{r sample_median_CLT}
 pop_median <- median(apipop$enroll)
@@ -1397,14 +1400,14 @@ p <- tibble(sample_ix = 1:500, sample_median = p) %>%
 p1 + p
 ```
 
-c)  Repeat for mean school size in stratified samples of size 100, 52, 24, 12
+  * Repeat for mean school size in stratified samples of size 100, 52, 24, 12
     using the same stratification proportions (50% elementary, 25% middle
     schools, 25% high schools) as in the built-in stratified sample.
 
 The same result holds since the samples are independent within and across strata
 as well.
 
-```{r}
+```{r q3_7_c}
 ns <- c(100, 52, 24, 12)
 simdf <- map_dfr(1:200, function(sim_ix) {
   map_dfr(ns, function(n) {
@@ -1490,7 +1493,7 @@ of strata.
     $n_2$ change, to find the optimum and to examine how sensitive the variance
     is the precise values of $n_1$ and $n_2$.
 
-```{r}
+```{r q2_9}
 strat_var_sample <- function(n_1, n_2, N_1, N_2, sigma_1, sigma_2) {
   one_strat_var <- function(n, N, sigma) {
     (N - n) / N * N^2 * sigma^2 / n
@@ -1525,9 +1528,12 @@ sizes are greater than 10, as stated previously.
 10. Verify that equation 2.2 gives the HTE of variance for a SRS
 
 
-a)  Show that when $i \neq j$ $$
-    \pi_{ij} = \frac{n}{N}n - 1N - 1
-    $$
+  *  Show that when $i \neq j$ 
+  
+$$
+\pi_{ij} = \frac{n}{N}n - 1N - 1
+$$
+
 This follows from combinatorics. We want the number of combinations in which
 two (different) items are chosen from a sample of n together, divided by the 
 total number of combinations of n samples from a population of size N. Though,
@@ -1539,13 +1545,14 @@ $$
 =\frac{n(n-1)n!}{2N(N-1)}
 $$
 I don't see yet how this reduces to the intended form but may return to this
-later.
+later. Perhaps the expression assuming sampling with replacement should be 
+used...
 
-b)  Compute $\pi_{ij} - \pi_i \pi_j$
+  * Compute $\pi_{ij} - \pi_i \pi_j$
 
-c)  Show that the equation in exercise 1.10 (c) reduces to equation 2.2
+  * Show that the equation in exercise 1.10 (c) reduces to equation 2.2
 
-d)  Suppose instead each individual in the population is independently sampled
+  * Suppose instead each individual in the population is independently sampled
     with probability $\frac{n}{N}$, so that the sample size $n$ is *not* fixed.
     Show that the finite population correction disappears from equation 2.2 for
     this *Bernoulli sampling* design.
@@ -1568,7 +1575,7 @@ a reasonable expense in precision.
 
 Depending on the type of clusters involved it can be easy to sample the entire
 cluster as classrooms, medical practice and workplaces are, however it is more
-likely that some subsampling within clusters will be performed for the sake of
+likely that some sub-sampling within clusters will be performed for the sake of
 efficiency. As Lumley notes, clusters in the first stage are called *Primary
 Sampling Units* or PSUs. "Stages" refer to the different levels at which
 sampling occurs. E.g. Sampling individuals within sampled census tracts within a
@@ -1576,7 +1583,7 @@ state would involve sampling census tracts in the first stage and then
 individuals in the second stage. The diagram below communicates this idea
 graphically.
 
-```{r, echo = FALSE}
+```{r multistage_diagram, echo = FALSE}
 grViz("
 digraph dot {
 graph [layout = dot]
@@ -1645,12 +1652,12 @@ identifier needs to be supplied to the `id` argument, as follows.
 # "https://github.com/cran/LogisticDx/blob/master/data/nhanes3.rda"
 ```
 
-```{r}
+```{r load_nhanes3}
 names3 <- load("Data/nhanes/nhanes3.rda")
 as_tibble(nhanes3)
 ```
 
-```{r}
+```{r nhanes3_design}
 svydesign(
   id = ~SDPPSU6, strat = ~SDPSTRA6,
   weight = ~WTPFHX6,
@@ -1670,12 +1677,12 @@ size 757 at the first stage for the number of school districts in CA and the
 number of schools within each district for the second stage. The weights need
 not be supplied if they can be worked out from the other arguments.
 
-```{r}
+```{r view_apicluster}
 data(api)
 as_tibble(apiclus2)
 ```
 
-```{r}
+```{r api_cluster_design}
 ## dnum = district id
 ## snum = school id
 ## fpc1 = school id number
@@ -1723,7 +1730,7 @@ quite small. These are the same ideas I discussed at the start of the notes but
 more discussion on this topic can be found in [@tille2006sampling;
 @hanif1980sampling].
 
-```{r}
+```{r pps_election_demo}
 data(election)
 election <- as_tibble(election) %>%
   mutate(
@@ -1744,7 +1751,7 @@ When Lumley's book was written, only the single stage approximation of PPS could
 be analyzed using the `survey` package. A demo is shown below using the voting
 data, where a PPS sample is constructed and then analyzed.
 
-```{r}
+```{r single_stage_approx_demo}
 data(election)
 election <- as_tibble(election) %>%
   mutate(
@@ -1759,7 +1766,7 @@ pps_design <- svydesign(id = ~1, weight = ~wt, data = ppsample)
 pps_design
 ```
 
-```{r}
+```{r single_stage_approx_results}
 svytotal(~ Bush + Kerry + Nader, pps_design, deff = TRUE)
 ```
 
@@ -1781,14 +1788,14 @@ Lumley illustrates how design effects can illustrate the impact on inference
 using the California school data set from before as well as the Behavioral Risk
 Factor Surveillance System from 2007.
 
-```{r}
+```{r cluster_design_demo}
 svymean(~ api00 + meals + ell + enroll, clus1_design, deff = TRUE)
 ```
 
 In the above, the variance is up to 10 times higher in the cluster sample as
 compared to a simple random sample.
 
-```{r}
+```{r cluster_design_demo_2}
 ## Lumley renames clus2_design to dclus2 from before. I maintain the same names.
 svymean(~ api00 + meals + ell + enroll, clus2_design, deff = TRUE, na.rm = TRUE)
 ```
@@ -1802,7 +1809,7 @@ as efficient statistically.
 Similarly, when computing the proportion of individuals who have more than 5
 servings of fruits and vegetables a day (X_FV5SRV = 2), as well as how often
 individuals received a cholesterol test in the past 5 years (X_CHOLCHK = 1) from
-the 2007 Behavioral Risk Factor Surveillance System dataset, we see design
+the 2007 Behavioral Risk Factor Surveillance System data set, we see design
 effects that reflect the geographic variability across the blocks of telephone
 numbers that were sampled for the survey.
 
@@ -1846,9 +1853,9 @@ Lumley illustrates this with the Survey of Income and Program Participation
 > the second stage sampled households within these PSUs.
 
 Lumley demonstrates how to estimate repeated measures with panel data using the
-`survey` package via the code below. 5 quantiles are estimated across the
+`survey` package via the code below. Five quantiles are estimated across the
 population and across the 8 months. When Lumley mentions that there is no need
-for adjusting for correlation in the blockquote above, I believe he is referring
+for adjusting for correlation in the block quote above, I believe he is referring
 to the within-month point estimates. If we were to try and estimate the change
 in, say, income as a function of other covariates I believe we would want to
 adjust for correlation in order to get the appropriate standard errors. For the
@@ -1857,7 +1864,7 @@ the per-month estimate, but would need to be divided by the number of samples
 when totaling across the number of measurements. Proportions or regressions are
 invariant to this scaling factor so no adjustment is needed there.
 
-```{r}
+```{r sipp_design}
 sipp_hh <- svydesign(
   id = ~ghlfsam, strata = ~gvarstr, nest = TRUE,
   weight = ~whfnwgt, data = "household", dbtype = "SQLite",
@@ -1894,7 +1901,7 @@ pltdf <- pltdf %>%
   )
 ```
 
-```{r}
+```{r sipp_income_quantiles}
 pltdf %>%
   mutate(quantile = factor(quantile)) %>%
   ggplot(aes(x = month, y = `Total Income`, color = quantile)) +
@@ -1909,7 +1916,7 @@ pltdf %>%
 Lumley notes here that we're only talking about correlation at all here because
 the same individuals are being measured across time. In a study like NHANES
 that recruits different individuals each year, we can effectively assume the
-samples are independent since the overall population si so big.
+samples are independent since the overall population is so big.
 
 Estimation would be much more complicated if the samples overlapped in some way.
 
@@ -1920,11 +1927,9 @@ Estimation would be much more complicated if the samples overlapped in some way.
     blood pressure data from NHANES 2003-2004. Code to load and merge these data
     sets is in Appendix B, in Figure B.1
 
-<!-- -->
+  * Construct a survey design object with these data.
 
-a.  Construct a survey design object with these data.
-
-```{r 31_a}
+```{r q3_1_a}
 ## data are from the book website:
 # https://r-survey.r-forge.r-project.org/svybook/
 # demographic data
@@ -1955,13 +1960,13 @@ bpdf_design <- bpdf %>%
 bpdf_design
 ```
 
-b.  Estimate the proportion of the US population with systolic blood pressure
+  * Estimate the proportion of the US population with systolic blood pressure
     over 140 mm HG, with diastolic blood pressure over 90 mm Hg, and with both.
     
 Lumley doesn't tell us which variable name corresponds to the measurements 
 indicated and I didn't see any documentation in the files included so I just
 guess here.
-```{r 31_b}
+```{r q3_1_b}
 bpdf_design %>%
   summarize(
     prop_hbp_one =
@@ -1973,13 +1978,13 @@ bpdf_design %>%
   gather(everything(), key = "metric", value = "value")
 ```
 
-c. Estimate the design effects for these proportions.
+  * Estimate the design effects for these proportions.
 
 Included in the output above.
 
-d. How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
+  * How do these proportions vary by age (`RIDAGEYR`) and gender (`RIAGENDR`)
 
-```{r 31_d}
+```{r q_3_1_d}
 nhanes_ests <- bpdf_design %>%
   group_by(sex, age_group) %>%
   summarize(
@@ -1996,7 +2001,7 @@ nhanes_ests
 This produces a bunch of output, so I plot the high blood pressure result ---
 both high systolic and diastolic blood pressure -- below.
 
-```{r 31_compiled}
+```{r q_3_1_compiled}
 nhanes_ests %>%
   select(age_group, sex, prob_hbp, prob_hbp_low, prob_hbp_upp) %>%
   filter(!is.na(age_group)) %>%
@@ -2012,11 +2017,11 @@ nhanes_ests %>%
   scale_y_continuous(labels = scales::percent)
 ```
 
-3.2 Repeat the sampling and estimation in Figure 3.4 1000 times.
+2. Repeat the sampling and estimation in Figure 3.4 1000 times.
 
 FYI the `sampling::UPtille` function takes a while so running this simulation
 1000 times takes a while.
-```{r 32_simulated_pps}
+```{r q3_2_simulated_pps}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2030,10 +2035,10 @@ OneSimulation <- function() {
 total_sims <- replicate(10, OneSimulation())
 ```
 
-a) Check that the mean of the estimated totals is close to the true population 
+* Check that the mean of the estimated totals is close to the true population 
 totals.
 
-```{r pps_totals}
+```{r q3_2_pps_totals}
 estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2050,11 +2055,11 @@ rbind(estimated_totals, true_totals) %>%
 
 These are quite close.
 
-b). Compute the mean of the estimated standard errors and compare it to the
+  * Compute the mean of the estimated standard errors and compare it to the
 true simulation standard error, that is, the standard deviation of the 
 estimated totals.
 
-```{r pps_stderrs, eval = FALSE}
+```{r q3_2_b_pps_stderrs, eval = FALSE}
 estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2072,10 +2077,10 @@ rbind(estimated_stderrs, true_stderr) %>%
 
 Same as above.
 
-c) Estimate 95% confidence intervals for the population totals and compute the 
+* Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
-```{r pps_cis, eval = FALSE}
+```{r q3_2_c_pps_cis, eval = FALSE}
 totals <- unlist(true_totals[, 1:3])
 prop_contained <- rowMeans((total_sims[, 3, ] < totals &
   total_sims[, 4, ] > totals) * 1)
@@ -2086,11 +2091,10 @@ We see that the proportion contained by the interval is near the 95% nominal
 value.
 
 
-3.3  The National Longitudinal Study of Youth is documented at 
+3.  The National Longitudinal Study of Youth is documented at 
 www.nlsinfo.org/nlsy97/nlsdocs/nlsy97/maintoc.html
 
-a) What are the stages of sampling and the sampling units at each stage?
-
+* What are the stages of sampling and the sampling units at each stage?
 
 From the 
 [website](https://www.nlsinfo.org/content/cohorts/nlsy97/intro-to-the-sample/sample-design-screening-process)
@@ -2111,8 +2115,8 @@ is, according to the general social survey
 Subsequent sampling units are segments, households, and then members of 
 households.
 
-b) What would the strata and PSUs be for the single stage approximation to 
-the design?
+  * What would the strata and PSUs be for the single stage approximation to 
+  the design?
 
 I don't know. It isn't clear how to reconstruct Lumley's example given that
 the data is not available. Looking at the NHIS 
@@ -2125,10 +2129,10 @@ but I'd guess that one could just concatenate the PSU and SSU labels and the
 same for the strata and then use those in a one stage design. This doesn't look 
 exactly like what Lumley does in his example.
 
-3.4  The British Household Panel Survey (BHPS) is documented at 
+4.  The British Household Panel Survey (BHPS) is documented at 
 http://www.iser.essex.ac.uk/survey/bhps (this website is no longer accurate) .
 
-a) What are the stages of sampling, strata and the sampling units at each stage?
+  * What are the stages of sampling, strata and the sampling units at each stage?
 
 The website given is no longer accurate. Clicking through the documentation of 
 the "Understanding Society" 
@@ -2145,18 +2149,18 @@ Ireland. 250 postcodes were chosen as the primary sampling unit, in the
 second stage, "delivery points" which are roughly equivalent to addresses were
 then selected.
 
-b) What would the strata and PSUs be for the single stage approximation to
-the design?
+  * What would the strata and PSUs be for the single stage approximation to
+  the design?
 
 Again, my best guess is to concatenate the postcodes and delivery addresses
 to construct the single stage identifiers, and the same for the strata.
 
 
-3.5 Statistics New Zealand lists survey topics at 
+5. Statistics New Zealand lists survey topics at 
 http://www.stats.govt.nz/datasets/a-z-list.htm . Find the Household Labour Force
 Survey.
 
-a) What are the stages of sampling and the sampling units at each stage?
+* What are the stages of sampling and the sampling units at each stage?
 
 Again, that site is no longer valid. The current help 
 [page](https://www.stats.govt.nz/help-with-surveys/list-of-stats-nz-surveys/about-the-household-labour-force-survey/)
@@ -2168,18 +2172,17 @@ ensure the sample is an accurate representation of New Zealand. Every person
 aged 15 years or over living in a selected house needs to take part.
 
 A different [doc](https://www.stats.govt.nz/assets/Uploads/Retirement-of-archive-website-project-files/Methods/Household-Labour-Force-Survey-sources-and-methods-2016/hlfs-sources-and-methods-2016.pdf#page=11.08)
-I found on google searching listed the 2016 survey design as a 2 stage 
+I found on Google listed the 2016 survey design as a 2 stage 
 design where samples are drawn from strata in the first stage. The PSU's 
 are "meshblocks" which appear to be the NZ equivalent of a U.S. 
 census block / tract.
 
-
-b) What would the strata and PSUs be for the single stage approximation to
-the design?
+  * What would the strata and PSUs be for the single stage approximation to
+  the design?
 
 Same answer here as previously.
 
-3.6 This exercise uses the Washington State Crime data for 2004 as the 
+6. This exercise uses the Washington State Crime data for 2004 as the 
 population. The data consists of crime rates and population size for the
 police districts (in cities/towns) and sheriffs' offices 
 (in unincorporated areas), grouped by county.
@@ -2188,15 +2191,15 @@ I took the data from this
 [website](https://www.waspc.org/cjis-statistics---reports). Specifically,
 [this excel sheet](https://waspc.memberclicks.net/index.php?option=com_content&view=article&id=121:crime-in-wa-archive-folder&catid=20:site-content). One of the tricky things about using this data was the fact 
 that several police districts are reported as having zero associated population.
-I removed these from the dataset to make things simpler.
+I removed these from the data set to make things simpler.
 
 
-a) Take a simple random sample of 10 counties from the state and use all the
-data from the sampled counties. Estimate the total number of murders and
-burglaries in the state.
+  * Take a simple random sample of 10 counties from the state and use all the
+  data from the sampled counties. Estimate the total number of murders and
+  burglaries in the state.
 
-```{r wacrime_36a}
-# data from
+```{r q3_6_a_wacrime}
+# data from https://www.waspc.org/cjis-statistics---reports)
 wa_crime_df <- readxl::read_xlsx("data/WA_crime/1984-2011.xlsx", skip = 4) %>%
   filter(Year == "2004", Population > 0) %>%
   mutate(
@@ -2232,12 +2235,12 @@ part_a
 ```
 
 
-b) Stratify the sampling so that King County is sampled with 100% probability
-together with a simple random sample of five other counties. Estimate the
-total number of of murders and burglaries in the state and compare to the
-previous estimates.
+  * Stratify the sampling so that King County is sampled with 100% probability
+  together with a simple random sample of five other counties. Estimate the
+  total number of of murders and burglaries in the state and compare to the
+  previous estimates.
 
-```{r wacrime_36b}
+```{r q3_6_b_wacrime}
 county_sample <- sample(county_list[-which(county_list == "king")], 5)
 county_sample <- c(county_sample, "king")
 part_b <- wa_crime_df %>%
@@ -2258,14 +2261,14 @@ part_b <- wa_crime_df %>%
 part_b
 ```
 
-c) Take simple random samples of five police districts from King County and
-five counties from the rest of the state. Estimate the total number of murders
-and burglaries in the state and compare to the previous estimates.
+  * Take simple random samples of five police districts from King County and
+  five counties from the rest of the state. Estimate the total number of murders
+  and burglaries in the state and compare to the previous estimates.
 
 This is a stratified two-stage sample design with no uncertainty in the 
 first stage in one (king county) strata, and no uncertainty in the second stage 
 in the other (non-king counties) strata.
-```{r wacrime_36c}
+```{r q_3_6_c_wacrime}
 king_districts <- wa_crime_df %>%
   filter(County == "king") %>%
   pull(Agency)
@@ -2289,11 +2292,11 @@ part_c
 ```
 
 
-d) Take a probability proportional to size (PPS) sample of 10 police districts.
-Estimate the total number of murders and burglaries in the state and compare
-to the previous estimates.
+  * Take a probability proportional to size (PPS) sample of 10 police districts.
+  Estimate the total number of murders and burglaries in the state and compare
+  to the previous estimates.
 
-```{r wacrime_36d}
+```{r q3_6_d_wacrime}
 pi <- sampling::inclusionprobabilities(a = wa_crime_df$Population, n = 10)
 part_d <- wa_crime_df %>%
   mutate(
@@ -2314,7 +2317,7 @@ e) Take a simple random sample of counties and include all the police districts.
 Estimate the total number of murders and burglaries in the state and
 compare to the previous estimates.
 
-```{r wacrime36e}
+```{r q_3_6_e_wacrime}
 county_sample <- sample(county_list, 10)
 part_e <- wa_crime_df %>%
   filter(County %in% county_sample) %>%
@@ -2330,7 +2333,7 @@ part_e
 
 I'll compare the standard error of all the estimates now.
 
-```{r compare_36_answers}
+```{r q_3_6_e_compare_36_answers}
 rbind(part_a, part_b, part_c, part_d, part_e) %>%
   select(Q, total_se) %>%
   gt::gt()
@@ -2342,16 +2345,16 @@ proportional to size sampling scheme. Finally, we see the two
 stratified multi-stage samples have variances in between, all of which makes 
 sense.
 
-3.7 Use the household data from the 1966 SIP panel to estimate the 25th, 50th,
+7. Use the household data from the 1966 SIP panel to estimate the 25th, 50th,
 75th, 90th and 95th percentiles of income for households of different sizes
-(`ehhnumpp`) averaged over the fourth months. You will want to recode the large
+(`ehhnumpp`) averaged over the fourth months. You will want to re-code the large
 values of `ehhnumpp` to a a single category. Describe the patterns you see.
 
 For this question we effectively copy the code from the "Repeated Measures"
-section, looking at quantile by a recoded household size now, instead of
+section, looking at quantile by a re-coded household size now, instead of
 month.
 
-```{r 37}
+```{r q_3_7}
 sipp_hh <- update(sipp_hh,
   household_size = factor(
     case_when(
@@ -2367,7 +2370,7 @@ qinc <- svyby(~thtotinc, ~household_size, svyquantile,
 )
 ```
 
-```{r}
+```{r q_3_7_2}
 pltdf <- as_tibble(qinc) %>%
   select(household_size, contains("thtotinc"), -contains("se.")) %>%
   gather(everything(), -household_size, key = "quantile", value = "Total Income") %>%
@@ -2401,13 +2404,14 @@ household size increases but then plateaus at around ~ 5. Additionally, there
 are few samples with very large households so estimating the quantiles for those
 groups is increasingly noisy.
 
-3.8 In the data from the 1996 SIPP panel
-a) What proportion of households received any "means-tested cash benefits"
-(`thtrninc`)? For those households that did receive benefits what mean
-proportion of their total income came from these benefits?
+8. In the data from the 1996 SIPP panel
+
+  * What proportion of households received any "means-tested cash benefits"
+  (`thtrninc`)? For those households that did receive benefits what mean
+  proportion of their total income came from these benefits?
 
 
-```{r 38a}
+```{r q_3_8_a}
 db <- DBI::dbConnect(RSQLite::SQLite(), "Data/SIPP/sipp.db")
 sipp_df <- tbl(db, sql("SELECT * FROM household")) %>%
   dplyr::collect() %>%
@@ -2417,6 +2421,7 @@ sipp_df <- tbl(db, sql("SELECT * FROM household")) %>%
     thtrninc = as.numeric(thtrninc),
     tmthrnt = as.numeric(tmthrnt)
   )
+DBI::dbDisconnect(db)
 
 sipp_hh_sub <- sipp_df %>%
   as_survey_design(
@@ -2427,7 +2432,7 @@ sipp_hh_sub %>%
   summarize(prop_benefit_recipients = survey_mean(benefit_recipient))
 ```
 
-```{r 38a_2}
+```{r q_3_8_a_2}
 sipp_hh_sub %>%
   filter(benefit_recipient == 1) %>%
   mutate(prop_benefit_income = thtrninc / thtotinc) %>%
@@ -2437,11 +2442,11 @@ sipp_hh_sub %>%
 ```
 
 
-b) What proportion of households paid rent `tmthrnt`? What were the mean and the
-75th and 95th percentiles of the proportion of monthly income paid in rent?
-What proportion paid more than one third of their income in rent?
+  * What proportion of households paid rent `tmthrnt`? What were the mean and the
+  75th and 95th percentiles of the proportion of monthly income paid in rent?
+  What proportion paid more than one third of their income in rent?
 
-```{r 38b}
+```{r q_3_8_b}
 sipp_hh_sub %>%
   mutate(
     pays_rent = I(as.numeric(tmthrnt) > 0) * 1,
@@ -2463,11 +2468,11 @@ sipp_hh_sub %>%
 ```
 
 
-3.9 By the time you read this, the `survey` package is likely to provide some
+9. By the time you read this, the `survey` package is likely to provide some
 approximations for PPS designs that use the finite population size information.
 Repeat 3.2 using these.
 
-```{r 39_simulated_pps}
+```{r q_3_9_simulated_pps}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2481,10 +2486,10 @@ OneSimulation <- function() {
 total_sims <- replicate(10, OneSimulation())
 ```
 
-a) Check that the mean of the estimated totals is close to the true population 
-totals.
+  * Check that the mean of the estimated totals is close to the true population 
+  totals.
 
-```{r 39_fpcpps}
+```{r q_3_9_fpcpps}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2499,7 +2504,7 @@ OneSimulation <- function() {
 total_sims <- replicate(10, OneSimulation())
 ```
 
-```{r 39_fpc_pps_totals}
+```{r q_3_9_fpc_pps_totals}
 estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2516,11 +2521,11 @@ rbind(estimated_totals, true_totals) %>%
 
 These are quite close.
 
-b). Compute the mean of the estimated standard errors and compare it to the
+* Compute the mean of the estimated standard errors and compare it to the
 true simulation standard error, that is, the standard deviation of the 
 estimated totals.
 
-```{r 39_pps_stderrs, eval = FALSE}
+```{r q_3_9_pps_stderrs, eval = FALSE}
 estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2536,7 +2541,7 @@ rbind(estimated_stderrs, true_stderr) %>%
   gt::tab_header("Simulated Standard Error Comparison")
 ```
 
-Estimate 95% confidence intervals for the population totals and compute the 
+* Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
 ```{r 39_pps_cis, eval = FALSE}
@@ -2546,37 +2551,37 @@ prop_contained <- rowMeans((total_sims[, 3, ] < totals &
 prop_contained
 ```
 
-3.10 Repeat 3.2 computing the Hartley-Rao approximation and the full 
+10. Repeat 3.2 computing the Hartley-Rao approximation and the full 
 Horvitz-Thompson estimate using the code and joint-probability data on the web
 site. Compare the standard errors from these two approximations to the standard
-errors from the single-stage with replacement approxmiation and to the true
+errors from the single-stage with replacement approximation and to the true
 simulation standard error.
 
-```{r 310}
+```{r q_3_10}
 ```
 
-3.11 Since 1999, NHANES has been conducting surveys continuously with data 
+11. Since 1999, NHANES has been conducting surveys continuously with data 
 released on a 2 year cycle. Each data set includes a weight variable for
 analyzing the two-year data; the weights add to the size of the US adult, 
 civilian, non-institutionalized population.
 
-a) What weight would be appropriate for estimating the number of diabetics in
-the population combining data from two two-year data sets?
+  * What weight would be appropriate for estimating the number of diabetics in
+  the population combining data from two two-year data sets?
 
-* Assuming these are non-overlapping samples --- which seems reasonable
---- and considering the target population we're generalizing to to be 
-roughly constant over the 4 years of interest, we could divide each of the 
-previous weights in half. This would give us twice the sample size to estimate
-the same target estimand.
+  * Assuming these are non-overlapping samples --- which seems reasonable
+  --- and considering the target population we're generalizing to to be 
+  roughly constant over the 4 years of interest, we could divide each of the 
+  previous weights in half. This would give us twice the sample size to estimate
+  the same target estimand.
 
-b) What weight would be appropriate if three two-year data sets were used?
+  * What weight would be appropriate if three two-year data sets were used?
 
-c) What weights would be appropriate when estimating changes, comparing
-the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
-2005-2006 data?
+  * What weights would be appropriate when estimating changes, comparing
+  the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
+  2005-2006 data?
 
-d) How would the answers differ if the goal was to estimate a population 
-proportion rather than a total?
+  * How would the answers differ if the goal was to estimate a population 
+  proportion rather than a total?
 
 
 # Chapter 4: Graphics
@@ -2687,6 +2692,7 @@ legend("bottomright",
   legend = c("Population", "Weighted estimate", "Unweighted Estimate")
 )
 ```
+
 Next Lumley plots an adjusted 
 [kaplan meier](https://en.wikipedia.org/wiki/Kaplan%E2%80%93Meier_estimator) 
 curve using `svykm()` on the National Wilms Tumor Study data. Unfortunately
@@ -2796,7 +2802,7 @@ the design information.
 #### Scatterplots
 
 
-To that end, Lumley uses a bubbleplot with the size of the "bubbles" 
+To that end, Lumley uses a bubble plot with the size of the "bubbles" 
 proportional to the sampling weight. This way, the viewer can identify which 
 points should be considered as "more" or less impactful in terms of representing 
 the population. I reproduce part of Figures 4.13 - 4.15 from the text below, 
@@ -2804,7 +2810,7 @@ for those plots in which Lumley includes the code. plots the systolic and
 diastolic blood pressure from the NHANES design.
 
 
-```{r}
+```{r scatterplots_demo}
 # TODO(petersonadam): Try plotting the api data here too
 par(mfrow = c(1, 2))
 svyplot(BPXSAR ~ BPXDAR,
@@ -2960,7 +2966,7 @@ the same design based estimates in the text. The data was procured from
 Lumley's [website](https://r-survey.r-forge.r-project.org/svybook/) --- 
 search for "BRFSS".
 
-```{r}
+```{r maps_demo}
 states <- read_sf("Data/BRFSS2007/brfss_state_2007_download.shp") %>%
   arrange(ST_FIPS)
 bys <- svyby(~X_FRTSERV, ~X_STATE, svymean,
@@ -3085,7 +3091,7 @@ plot(svysmooth(BPXSAR ~ RIDAGEYR, nhanes))
 
 
 4. With the data from the SIPP 1996 panel draw the cumulative distribution 
-function  densityfunction, a histogram and a boxplot of total household income.
+function  density function, a histogram and a boxplot of total household income.
 Compare these graphs for their usefulness in showing the distribution of
 income.
 
@@ -3106,9 +3112,8 @@ plot(svysmooth(bmi_p ~ srage_p, chis),
 )
 ```
 
-We see a very distinctive U-shape - with middle aged indviduals - 50 to 60 year
-olds - having the highest average BMI, but the young and old having lower
-BMI's.
+We see a very distinctive U-shape - with middle aged individuals - 50 to 60 year
+olds - having the highest average BMI, but the young and old having lower BMI's.
 
 7. The left-hand panel of Figure 3.3 shows an interesting two-lobed pattern. 
 Can you find what makes these lobes?
@@ -3466,7 +3471,7 @@ text.
 ### Linear models in the `survey` package
 
 
-**Example:Dietary sodium and potassium and blood pressure**
+Example: Dietary sodium and potassium and blood pressure
 
 
 ```{r sodium_nhanes_merge}
@@ -3526,6 +3531,8 @@ points(svyplot(BPXSAR ~ sodium,
 ))
 lines((svysmooth(BPXSAR ~ sodium, des)))
 ```
+
+
 To test this hypothesis, Lumley first visualizes the three variables using the
 conditional plot demonstrated previously.
 
@@ -5567,6 +5574,7 @@ postStratify(
 
 
 ```{r q7_4_og_stratify}
+DBI::dbDisconnect(db)
 brfss_fl %>%
   group_by(BMI_Cat) %>%
   summarize(
@@ -5766,7 +5774,7 @@ thinking of further stratification or unequal sampling but I can't be sure.
 ## Sampling from Existing Cohorts
 
 Lumley notes in this section that it is often advantageous in larger
-randomized control trials or cohort studies to subsample once certain 
+randomized control trials or cohort studies to sub-sample once certain 
 measurements have been taken. Lumley gives an account of methods used on these
 data --- previously nested case control designs, ignoring the phase one sample 
 and cohort representativeness but more recently stratifying on both outcome and 
@@ -7644,16 +7652,20 @@ which includes
 [documentation](https://faculty.washington.edu/heagerty/Books/AnalysisLongitudinal/mscm.txt)
 I would encourage looking over.
 
-This dataset comes from the The Mothers' and Children's Morbidity Study which
+This data set comes from the The Mothers' and Children's Morbidity Study which
 examined how maternal stress might impact childhood illness. Stress and illness
 were measured for 30 days on 167 mother-child pairs on a 0-1 scale. 
 
 I reproduce Lumley's analysis in the code below examining the effect of a 
 mother's stress on her child's illness. 
 
-
 Lumley begins by filtering the data to only include mother-child pairs with
 28 non-missing observations and ~ 3 weeks of data.
+
+I try to reproduce Lumley's plots below but I think he may have produced them
+before filtering or with alternative filtering in place, as we see a similar
+trend in both plots but different absolute estimates.
+
 ```{r msm_maternal_stress_demo}
 mscm <- read_table("data/mscm.txt",col_names = c("id","day","stress", paste("s",1:6,sep=""),
                  "illness", paste("i",1:6,sep=""),
@@ -7661,15 +7673,56 @@ mscm <- read_table("data/mscm.txt",col_names = c("id","day","stress", paste("s",
                  "csex","hsize","wk1illness","wk1stress"))
 mscm$nna <- with(mscm, ave(stress + illness, id, FUN = function(x) sum(!is.na(x))))
 mscm <- subset(mscm, nna == 28 & day > 6 & day < 29)
-
 ```
 
 
-Lumley produces stabilized weights by averaging two model's respective 
-probabilities of stress. A model (1) that includes the child's current and previous 
-state of illness (which might cause subsequent stress on the mother's part), 
-as well as the current day in the study and baselines stress and a second (2)
-that looks only at the baseline stress and change in mother's stress over time.
+```{r msm_plot_one}
+# I try to reproduce Figure 10.5 here. While it's not the same as Lumley's
+# plot, we do see a similar trend.
+unwt <- svydesign(id = ~id, data = mscm)
+eda_fit <- svyglm(i3 ~ s1 + s2 + s3 + s4 + s5 + s6 - 1, family = quasibinomial,
+               design = unwt)
+broom::tidy(eda_fit, conf.int = TRUE) %>% 
+  mutate(time_offset = as.integer(str_replace(term,"s","")) - 3) %>% 
+  ggplot(aes(x = time_offset, y = estimate)) + 
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) + 
+  xlab("Time Offset") +
+  ylab("Log Odds Ratio") + 
+  geom_vline(aes(xintercept = 0), linetype = 2, color = 'red') +
+  ggtitle("Childhood Illness and Mother's Stress",
+          subtitle = "Log Odds Ratio of Illness vs. Stress Over Time")
+```
+
+```{r msm_plot_two}
+# I try to reproduce Figure 10.6 here. Again, this isn't the same as Lumley's
+# plot but we see a similar trend. I'm guessing he might not've filtered 
+unwt <- svydesign(id = ~id, data = mscm)
+ill_eda <- svyglm(illness ~ i1 + i2 + i3 + i4 + i5 + i6 - 1, family = quasibinomial,
+               design = unwt)
+stress_eda <- svyglm(stress ~ s1 + s2 + s3 + s4 + s5 + s6 - 1, family = quasibinomial,
+               design = unwt)
+broom::tidy(ill_eda, conf.int = TRUE) %>% 
+  mutate(model = "illness") %>% 
+  rbind(.,tidy(stress_eda, conf.int = TRUE) %>% 
+          mutate(model = "stress")) %>% 
+  mutate(time_lag = as.integer(str_replace(term,"i|s",""))) %>% 
+  ggplot(aes(x = time_lag, y = estimate, color = model)) + 
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) + 
+  geom_line() +
+  xlab("Time Lag") +
+  ylab("Log Odds Ratio") + 
+  ggtitle("Log Odds Ratios of Childhood Illness and Mother's Stress 
+          for different time lags.") +
+  theme(legend.title = element_blank())
+```
+
+
+To analyze the data, Lumley produces stabilized weights by averaging two 
+model's respective probabilities of stress. A model (1) that includes the 
+child's current and previous state of illness (which might cause subsequent 
+stress on the mother's part), as well as the current day in the study and 
+baselines stress and a second (2) that looks only at the baseline stress and 
+change in mother's stress over time.
 
 When Lumley talks about separating the exposure model from the outcome without
 having to worry about self-caused confounding --- child's illness inducing 
@@ -7745,6 +7798,11 @@ Lumley notes that this is often the case for methods like these, as removing
 so much confounding from observational data results in very small subsequent
 effect typically.
 
+
+This method is fairly sophisticated. Lumley cites the following papers that
+analyzed this data and I'd also encourage the interested reader to check out 
+Hernan and Robins book on Causal Inference [@hernan2010causal].
+
 ## Exercises
 
 There are no exercises for this chapter.
@@ -7755,7 +7813,6 @@ There are no exercises for this chapter.
 <details>
 
 ```{r session_info}
-DBI::dbDisconnect(db)
 sessionInfo()
 ```
 
