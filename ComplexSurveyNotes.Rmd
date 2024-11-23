@@ -2599,16 +2599,15 @@ All three of these strategies are meant to counteract the difficulty in
 visualizing survey data --- the data available do not represent the population
 of interest without re-weighting.
 
-While these principles are great and worth following, I found Lumley's
-demonstrations in this chapter a little out of date. Thanks to the
-[ggplot](https://ggplot2.tidyverse.org/) family of libraries and
-[shiny](https://www.rstudio.com/products/shiny/) there's been huge advances in
-visualizing and interacting with data of all types -- survey included. What's
-more, it isn't always clear how he produces the charts in the chapter.
-Consequently I've done my best to reproduce the same charts, or a chart I'd
-consider appropriate for the question / survey at hand in the following charts.
+Like other parts of the book, it isn't always clear how Lumley produces the 
+charts in the chapter. I've done my best to reproduce the same charts, or a 
+chart I'd consider appropriate for the question / survey at hand. That said, I 
+don't always use base R as he does, though I 
+do stick to the base R version of the survey plots he implemented in the 
+survey package. There is, however, a 
+[ggsurvey](https://cran.r-project.org/web/packages/ggsurvey/index.html) package
+on CRAN that reproduces his same plots in the tidyverse friendly style fashion.
 
-TODO: Talk about ggsurvey.
 
 ## Plotting a Table
 
@@ -2706,6 +2705,8 @@ dcchs <- svydesign(ids = ~1, data = nwtco)
 scurves <- svykm(Surv(edrel / 365.25, rel) ~ histol, dcchs)
 plot(scurves)
 ```
+
+
 The interpretation of this graph is that relapse (into cancer) appears to 
 occur within about three years, if at all. The top line shows the survival
 for those with a favorable histology classification with an even better
@@ -2719,7 +2720,7 @@ to mine created with an equal probability sample... An error here perhaps.
 
 #### Boxplots
 
-Lumley describes the typical boxplots as
+Lumley describes the typical box plots as
 
 > based on the quartiles of the data: the box shows the median and first and 
 third quartiles, the whiskers extend out to the last observation within 1.5
@@ -2760,7 +2761,7 @@ an increase in systolic blood pressure medians and third quartiles across age.
 #### Graphs based on the density
 
 Histograms and kernel density estimators both visualize the probability
-distribution function(pdf) of a given dataset. Confusingly, perhaps, there 
+distribution function(pdf) of a given data set. Confusingly, perhaps, there 
 is no pdf to estimate in finite population inference because the sampling
 is random instead of the data. Still, the analogous effort can be made where
 a given proportion is estimated for some number of bins of the variable of 
@@ -3063,7 +3064,7 @@ ggplot() +
 
 ## Exercises
 
-1. Draw boxplots of body mass index by race/ethnicity and by sex using the 
+1. Draw box plots of body mass index by race/ethnicity and by sex using the 
 CHIS 2005 data introduced in Chapter 2.
 
 ```{r chis_bmi_race}
@@ -3074,38 +3075,103 @@ svyboxplot(bmi_p ~ racehpr, chis, main = "BMI By Race/Ethnicity")
 svyboxplot(bmi_p ~ srsex, chis, main = "BMI BY Sex")
 ```
 
-2. Using the code in Figure 3.8 draw a barplot of the quantiles of income
-and compare it to the dotchart in Figure 3.9. What are some advantages and
+2. Using the code in Figure 3.8 draw a bar plot of the quantiles of income
+and compare it to the dot chart in Figure 3.9. What are some advantages and
 disadvantages of each display.
 
-```{r}
+```{r q4_2}
+pltdf <- as_tibble(qinc) %>%
+  select(household_size, contains("thtotinc"), -contains("se.")) %>%
+  gather(everything(), -household_size, key = "quantile", value = "Total Income") %>%
+  mutate(quantile = as.numeric(str_extract(quantile, "[0-9].[0-9]?[0-9]")) * 100)
+
+se <- as_tibble(qinc) %>%
+  select(household_size, contains("se.")) %>%
+  gather(everything(), -household_size, key = "quantile", value = "SE") %>%
+  mutate(quantile = as.numeric(str_extract(quantile, "[0-9].[0-9]?[0-9]")) * 100)
+
+pltdf <- pltdf %>%
+  left_join(se) %>%
+  mutate(
+    lower = `Total Income` - 2 * SE,
+    upper = `Total Income` + 2 * SE
+  )
+
+pltdf %>%
+  mutate(quantile = factor(quantile)) %>%
+  ggplot(aes(x = household_size, y = `Total Income`, fill = quantile)) +
+  geom_bar(stat = 'identity', position='dodge') +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position='dodge') +
+  xlab("Household Size") +
+  ylab("Total Income (USD)") +
+  ggtitle("Total Income Quantiles",
+    subtitle = "Survey of Income and Program Participation"
+  )
 ```
+
+I prefer the dot plot as I feel the bar plot takes up more space to convey the 
+same amount of information. However, I think the bar plot might make it easier 
+to compare the income quantiles within household size as they are right next to
+each other.
 
 3. Use `svysmooth()` to draw a graph showing change in systolic and diastolic
 blood pressure over time in the NHANES 2003-2004 data. Can you see the change
 to isolated systolic hypertension in old age that is shown in Figure 4.5.
 
-```{r}
+```{r q4_3}
 plot(svysmooth(BPXSAR ~ RIDAGEYR, nhanes))
 ```
 
 
 4. With the data from the SIPP 1996 panel draw the cumulative distribution 
-function  density function, a histogram and a boxplot of total household income.
-Compare these graphs for their usefulness in showing the distribution of
+function  density function, a histogram and a box plot of total household 
+income. Compare these graphs for their usefulness in showing the distribution of
 income.
 
-```{r}
+```{r q4_4_cdf}
+sipp_hh <- svydesign(
+  id = ~ghlfsam, strata = ~gvarstr, nest = TRUE,
+  weight = ~whfnwgt, data = "household", dbtype = "SQLite",
+  dbname = "Data/SIPP/sipp.db"
+)
+plot(svycdf(~thtotinc, sipp_hh))
 ```
 
+```{r q4_4_hist}
+svyhist(~thtotinc, sipp_hh)
+```
+
+```{r q4_4_boxplot}
+svyboxplot(thtotinc~1, sipp_hh)
+```
+
+I think I prefer the histogram the most out of these in terms of conveying the 
+most information with the space available. Both the box plot and the cdf give
+a good sense that the data is skewed, but gives very little sense of how much
+density or probability mass can be found in the lower incomes. Only the 
+histogram does that to my satisfaction.
+
 5. With the data from the SIPP 1996 panel draw a graph showing amount of rent 
-(`tmthrent`)  and proportion of income paid to rent. You will want to exclude
+(`tmthrnt`)  and proportion of income paid to rent. You will want to exclude
 some outlying households that report much higher rent than income.
+
+```{r q4_5}
+sipp_hh <- update(sipp_hh,
+    pct_income_rent = (as.numeric(tmthrnt) / as.numeric(thtotinc) * 100),
+  ) 
+svyplot(tmthrnt ~ pct_income_rent, 
+        subset(sipp_hh,
+               pct_income_rent < Inf &
+               tmthrnt < thtotinc &
+               pct_income_rent < 100),
+        xlab = "% Income Paid To Rent",
+        ylab = "Rent (USD)") 
+```
 
 6. Using data from CHIS 2005 (see section 2.3.1) examine how body mass index
 varies with age as we did with blood pressure in this chapter.
 
-```{r}
+```{r q4_6}
 plot(svysmooth(bmi_p ~ srage_p, chis),
   xlab = "Age", ylab = "BMI",
   main = "BMI vs. Age (CHIS data)"
@@ -3118,10 +3184,12 @@ olds - having the highest average BMI, but the young and old having lower BMI's.
 7. The left-hand panel of Figure 3.3 shows an interesting two-lobed pattern. 
 Can you find what makes these lobes?
 
+As stated previously, I don't have access to this data.
+
 8. Set up a survey design for the BRFSS 2007 data as in Figure 3.7. BRFSS
 measured annual income (`income2`) in categories < \$10K, \$10-15k \$20-25k,
-\$25-35k, \$35-50k, \$50-75k, > \$75k and race (`orace`) :white,black, asian,
-native hawaiian/pacific island, native american, other.
+\$25-35k, \$35-50k, \$50-75k, > \$75k and race (`orace`): White, Black, Asian,
+Native Hawaiian/Pacific Islander, Native American, other.
 
 * Draw a graph of income by race.
 * Draw maps showing the geographical distribution of income and of racial 
@@ -3129,8 +3197,52 @@ groups.
 * Draw a set of maps examining whether the geographical distribution of income
 differs by race.
 
+I don't see the race or income variables listed as Lumley describes in my
+version of the BRFSS data, and while there are certain race variables,
+it isn't clear how they map to White, black asian, etc.
+
 9. Explore the impact on the graphs in Figure 4.18 of changes in the amount of 
 smoothing, by altering the `df` argument to the code in Figure 4.19
+
+```{r q4_9}
+a25 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .25, df = 7
+)
+a50 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .5, df = 7
+)
+a75 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .75, df = 7
+)
+a10 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .1, df = 7
+)
+a90 <- svysmooth(BPXSAR ~ RIDAGEYR,
+  method = "quantreg", design = adults,
+  quantile = .9, df = 7
+)
+plot(BPXSAR ~ RIDAGEYR,
+  data = nhanes, type = "n", ylim = c(80, 200),
+  xlab = "Age", ylab = "Systolic Pressure"
+)
+lines(a50, lwd = 3)
+lines(a25, lwd = 1)
+lines(a75, lwd = 1)
+lines(a10, lty = 3)
+lines(a90, lty = 3)
+legend("topleft",
+  legend = c("10%,90%", "25%, 75%", "median"),
+  lwd = c(1, 1, 3), lty = c(3, 1, 1), bty = "n"
+)
+```
+
+We see that increasing the degrees of smoothing increases the "wiggliness" of
+the plot which makes sense since we're increasing the flexibility of the 
+functional form estimated.
 
 # Chapter 5: Ratios and Linear Regression
 
@@ -3426,7 +3538,7 @@ which population information is available.
 
 **US Elections**
 
-Similarly it doesn't look like the dataset included in the current `survey` R
+Similarly it doesn't look like the data set included in the current `survey` R
 package has data for the 2008 election - I only see Bush / McCain vote totals.
 
 
@@ -3881,11 +3993,11 @@ We can see that the estimate is quite close to the population value
 
 * Estimate the ratio of population totals for monthly rent (`tmthrnt`) and
 total household income (`thtrninc`) over the whole population and over the
-subpopulation who pay rent.
+sub-population who pay rent.
 
 I think Lumley may have an error here when he says that `thtrninc` is the 
 total household monthly income - earlier we used `thtotinc` for this measure 
-as he had increating Figure 3.9. Consequently, I use `thtotinc` below.
+as he had in creating Figure 3.9. Consequently, I use `thtotinc` below.
 
 ```{r 53a_1}
 sipp_hh_sub %>%
@@ -3905,7 +4017,7 @@ sipp_hh_sub %>%
 ```
 * Compute the individual-level ratio, i.e., the proportion of household income
 paid in rent, and estimate the population mean over the whole population and 
-over the subpopulation who pay rent.
+over the sub-population who pay rent.
 
 ```{r 53b_1}
 # Full Population
@@ -5754,7 +5866,7 @@ sampling in the phase-two sample, a practice known in the epidemiology
 literature as *frequency matching*.  
 
 The idea is to avoid wasting cases / controls in regions of low exposure. 
-Lumley uses the example of the oesphageal cancer study to illustrate. Bracket
+Lumley uses the example of the esophageal cancer study to illustrate. Bracket
 text below is mine:
 
 > ... very little information about the effects of alcohol and tobacco is 
