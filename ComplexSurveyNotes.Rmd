@@ -105,8 +105,9 @@ non-uniform sample with inclusion probabilities is needed.
 Its worth further pointing out that the topic of how samples themselves are
 drawn is a complicated one its own right and that the functions in the
 `sampling` package each have pros and cons according to the target estimand or
-question. Drawing samples with replicate weights -- discussed in Chapter 2 -- is
-a similarly complex question which I haven't yet resolved to my satisfaction.
+question of interest. Drawing samples with replicate weights 
+-- discussed in Chapter 2 -- is a similarly complex question which I haven't 
+yet resolved to my satisfaction.
 
 # Chapter 1: The Basics
 
@@ -2472,7 +2473,7 @@ sipp_hh_sub %>%
 approximations for PPS designs that use the finite population size information.
 Repeat 3.2 using these.
 
-```{r q_3_9_simulated_pps}
+```{r q_3_9_simulated_pps, cache=TRUE}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2483,13 +2484,13 @@ OneSimulation <- function() {
   ci <- confint(total)
   out <- cbind(total, std_err, ci)
 }
-total_sims <- replicate(10, OneSimulation())
+total_sims <- replicate(100, OneSimulation())
 ```
 
   * Check that the mean of the estimated totals is close to the true population 
   totals.
 
-```{r q_3_9_fpcpps}
+```{r q_3_9_fpcpps, cache=TRUE}
 OneSimulation <- function() {
   insample <- sampling::UPtille(election$p)
   ppsample <- election[insample == 1, ]
@@ -2501,10 +2502,10 @@ OneSimulation <- function() {
   ci <- confint(total)
   out <- cbind(total, std_err, ci)
 }
-total_sims <- replicate(10, OneSimulation())
+total_sims <- replicate(100, OneSimulation())
 ```
 
-```{r q_3_9_fpc_pps_totals}
+```{r q_3_9_fpc_pps_totals, cache=TRUE}
 estimated_totals <- as_tibble(t(rowMeans(total_sims[, 1, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2525,7 +2526,7 @@ These are quite close.
 true simulation standard error, that is, the standard deviation of the 
 estimated totals.
 
-```{r q_3_9_pps_stderrs, eval = FALSE}
+```{r q_3_9_pps_stderrs, eval = TRUE, cache=TRUE}
 estimated_stderrs <- as_tibble(t(rowMeans(total_sims[, 2, ]))) %>%
   mutate(label = "Estimate")
 
@@ -2544,7 +2545,7 @@ rbind(estimated_stderrs, true_stderr) %>%
 * Estimate 95% confidence intervals for the population totals and compute the 
 proportion of intervals that contain the true population value.
 
-```{r 39_pps_cis, eval = FALSE}
+```{r 39_pps_cis, eval = TRUE, cache=TRUE}
 totals <- unlist(true_totals[, 1:3])
 prop_contained <- rowMeans((total_sims[, 3, ] < totals &
   total_sims[, 4, ] > totals) * 1)
@@ -2557,8 +2558,7 @@ site. Compare the standard errors from these two approximations to the standard
 errors from the single-stage with replacement approximation and to the true
 simulation standard error.
 
-```{r q_3_10}
-```
+Not clear to me where this code is when looking on his website.
 
 11. Since 1999, NHANES has been conducting surveys continuously with data 
 released on a 2 year cycle. Each data set includes a weight variable for
@@ -2568,20 +2568,34 @@ civilian, non-institutionalized population.
   * What weight would be appropriate for estimating the number of diabetics in
   the population combining data from two two-year data sets?
 
-  * Assuming these are non-overlapping samples --- which seems reasonable
-  --- and considering the target population we're generalizing to to be 
-  roughly constant over the 4 years of interest, we could divide each of the 
-  previous weights in half. This would give us twice the sample size to estimate
-  the same target estimand.
+Assuming these are non-overlapping samples --- which seems reasonable
+--- and considering the target population we're generalizing to be 
+roughly constant over the 4 years of interest, we could divide each of the 
+previous weights in half. This would give us twice the sample size to estimate
+the any target estimand considering the four year population as roughly
+homogeneous.
 
-  * What weight would be appropriate if three two-year data sets were used?
+* What weight would be appropriate if three two-year data sets were used?
 
-  * What weights would be appropriate when estimating changes, comparing
-  the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
-  2005-2006 data?
+Divide the weights by 3.
 
-  * How would the answers differ if the goal was to estimate a population 
-  proportion rather than a total?
+* What weights would be appropriate when estimating changes, comparing
+the combined 1999-2000 and 2001-2002 data with the combined 2003-2004 and 
+2005-2006 data?
+
+You'd need to use the original weights and set these up as different strata.
+Or at least, that's the most intuitive answer to me.
+
+* How would the answers differ if the goal was to estimate a population 
+proportion rather than a total?
+
+If estimating a population total the weights would need to be adjusted further
+such that the population total of each sample remained the same and the two
+samples added up to the combined population from each sample -- this would be
+more complicated than just dividing by two as suggested above. For proportions
+this would matter less when using the simpler method above, assuming no 
+dramatic change in the total population, but could still differ slightly 
+if using the total adjusted weights.
 
 
 # Chapter 4: Graphics
@@ -4262,27 +4276,72 @@ $$
 E \left [ \sum_{i=1}^{N} R_ix_i (y_i - x_i \beta^*)\right ] = 0
 $$
 
-so that the unweighted sample estimating equations are unbiased.
+so that the un-weighted sample estimating equations are unbiased.
 
-TODO(apeterson91)
+
+If we take the expectation over $R_i$ in the last formula we get
+$$
+ \sum_{i=1}^{N} \pi_ix_i (y_i - x_i \beta^*)  = 0,
+$$
+
+where $\pi_i = E[R_i]$, the probability of being included in the sample. At this
+point it isn't immediately clear to me how to proceed. One easy result is that
+if $\pi_i = \pi \forall i$, then we have 
+$$
+\pi \sum_i^N x_i(y_i - x_i\beta^*) = 0 \\
+\iff 
+\sum_i^N x_i(y_i - x_i\beta^*) = 0
+$$
+
+which proves the desired claim.
 
 5.8 A rough approximation to the loss of efficiency from unnecessarily using
 weights can be constructed by considering the variance of the residuals in 
-weighted and unweighted estimation. Assume as an approximation that the 
+weighted and un-weighted estimation. Assume as an approximation that the 
 residuals $r_i$ are independent of the sampling weights $w_i$
 
 * Show that 
 $$ 
-V[\sum_{i=1}^{n} w_ir_i] = E[w^2] V[r] + V[w]E[r^2]
+V[\sum_{i=1}^{n} w_i r_i] = E[w^2] V[r] + V[w]E[r^2]
 $$
 
-TODO(apeterson91)
+
+I show the proof below, though I think Lumley forgot a factor of $n$. This 
+doesn't change anything substantial.
+
+$$
+V[\sum_{i=1}^{n} w_i r_i] \stackrel{ind}{=} \sum_{i=1}^{n} V[w_ir_i] \\
+\stackrel{id}{=} n (E[(wr)^2] -  E[wr]^2) \\
+\stackrel{ind}{=} n (E[w^2r^2] -  E[w]^2E[r]^2) \\
+\stackrel{ind}{=} n (E[w^2]E[r^2] -  E[w]^2E[r]^2) \\
+= n(E[w^2](E[r^2] - E[r]^2)  + (E[w^2]E[r]^2 - E[w]^2E[r]^2)) \\
+= n(E[w^2V[r] + V[w]E[r^2]) \\
+\blacksquare
+$$
 
 * Now assume that the mean of the residuals is zero, and show that the 
-relative efficiency of the unweighted estimate is $1 + cv(w)$ where $cv$ is the
+relative efficiency of the un-weighted estimate is $1 + cv(w)$ where $cv$ is the
 coefficient of variation, the ratio of the standard deviation to the mean.
 
-TODO(apeterson91)
+First note that $E[r] = 0 \implies V[r] = E[r^2]$. Then the expression from
+the first part --- now omitting $n$ --- reduces to:
+
+$$
+E[w^2]E[r^2] + V[w]E[r^2] = E[r^2](E[w^2] + V[w])
+$$
+If we take the ratio of this to the variance of the un-weighted residuals we'd 
+get 
+
+$$
+\frac{V[\sum_{i=1}^{n}r_iw_i]}{V[\sum_{i=1}^{n} r_i]} = \frac{E[r^2](E[w^2] + V[w])}{E[r^2] - E[r]^2} \\
+= (E[w^2] + V[w]) \\
+= 1 + \frac{V[w]}{E[w^2]}
+$$
+
+At this point I'd like to say that you can take the square root of the term on
+the right, but that's not quite accurate and doesn't make sense algebraically.
+To get to the mean we'd need to have $E[w]^2$ in the denominator which we don't
+quite have.
 
 # Chapter 6: Categorical Data Regression
 
@@ -4344,7 +4403,7 @@ the phenomenon we're observing is likely a *cohort effect* since, as Lumley
 notes, its likely that born before the arrival of the internet are less likely
 to use it.
 
-We see this same pattern in the boxplot showing internet use across income;
+We see this same pattern in the box plot showing internet use across income;
 men using internet more than women. We also see that those with higher incomes 
 tend to use the internet more than those with lower incomes. In contrast
 to the cohort effect seen above, Lumley suggests that income may be more of
