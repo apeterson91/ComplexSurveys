@@ -1534,29 +1534,60 @@ sizes are greater than 10, as stated previously.
 $$
 \pi_{ij} = \frac{n}{N}n - 1N - 1
 $$
+It isn't completely clear from the above, but I think Lumley means for there
+to be parentheses around the $n-1$ and $N-1$ terms, that is:
+$$
+\pi_{ij} = \frac{n}{N}(n-1)(N-1)
+$$
 
 This follows from combinatorics. We want the number of combinations in which
 two (different) items are chosen from a sample of n together, divided by the 
-total number of combinations of n samples from a population of size N. Though,
-it isn't clear to me whether the overall sampling design should be with or 
-without replacement - I assume without below.
+total number of combinations of n samples from a population of size N. 
 
 $$
 \frac{n \choose 2}{N\choose n} = \frac{n!}{(n-2)!2!} \frac{(N-n)!n!}{N!} \\
-=\frac{n(n-1)n!}{2N(N-1)}
+=\frac{n(n-1)}{2} \times \frac{(N-n)!n!}{N!}
 $$
 I don't see yet how this reduces to the intended form but may return to this
-later. Perhaps the expression assuming sampling with replacement should be 
-used...
+later.
 
   * Compute $\pi_{ij} - \pi_i \pi_j$
 
+Using the expression Lumley gives us for $\pi_{ij}$, and assuming a similar
+combinatoric form for $\pi_i, \pi_j$,
+
+$$
+\pi_{ij} - \pi_i \pi_j =  \frac{n}{N}(n-1)(N-1) - \left(\frac{n (N-n)!n!}{N!}\right)^2.
+$$
+
   * Show that the equation in exercise 1.10 (c) reduces to equation 2.2
+  
+I'm clearly on the wrong track here. My formulation of the combinatorics must
+be throwing me off. Feel free to 
+[file an issue](https://github.com/apeterson91/ComplexSurveys/issues) in the 
+repo for these notes if you see what I'm missing.
 
   * Suppose instead each individual in the population is independently sampled
     with probability $\frac{n}{N}$, so that the sample size $n$ is *not* fixed.
     Show that the finite population correction disappears from equation 2.2 for
     this *Bernoulli sampling* design.
+    
+$$
+V[\hat{T}_{HTE,Bern}] = V[\sum_{i=1}^{N} R_i \frac{Y_i}{\pi}] \\
+\stackrel{ind}{=} \sum_{i=1}^{N} V[R_i \frac{Y_i}{\pi}] \\
+= \sum_{i=1}^{N} \pi(1-\pi)\frac{Y_i^2}{\pi^2}\\
+= \frac{(1-\pi)}{\pi}\sum_{i=1}^{N}Y_i^2 \\
+= (\frac{1}{\pi} - 1) \sum_{i=1}^{N}Y_i^2 \\ 
+= \frac{N -n}{n} \sum_{i=1}^{N} Y_i^2, \quad  \pi := \frac{n}{N}
+$$
+which can be understand as equivalent to equation 2.2 where --- assume without
+loss of generality --- that the variable $Y$ has $E[Y]=0$ then it 
+is easy to see that the equation reduces to
+$$
+(N-n) \times N \times \frac{V[Y]}{n} = (N^2 - Nn) \frac{V[Y]}{n}
+$$
+
+which replaces the finite population correction factor with the $N^2 - Nn$ term.
 
 # Chapter 3: Cluster Sampling
 
