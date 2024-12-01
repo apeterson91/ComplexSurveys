@@ -2,15 +2,23 @@
 title: "Complex Survey Notes"
 author: "Adam Peterson"
 date: "`r Sys.Date()`"
-output: 
-  html_document:
-    code_folding: hide
-    toc: true
-    toc_float: true
 bibliography: surveybib.bib
-editor_options: 
-  markdown: 
-    wrap: 80
+theme:
+  dark: darkly
+  light: lightly
+format: 
+  html:
+    toc: true
+    html-math-method: katex
+    code-link: true
+    code-fold: true
+    code-summary: "Show the code"
+    include-in-header:
+      - file: github-corner.html
+comments:
+  giscus: 
+    repo: apeterson91/ComplexSurveys
+editor: visual
 ---
 
 ```{r setup, include=FALSE}
@@ -46,15 +54,16 @@ theme_set(theme_bw() + theme(
 ## Overview
 
 What follows is a coded work through of Thomas Lumley's "Complex Surveys: A
-Guide to Analysis in R" [@lumley2011complex] and the methods underlying
+Guide to Analysis in R" [@lumley2011complex] and some of the methods underlying
 [design based](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2856970/)
 statistics more broadly. This write-up reflects my understanding of the
 material with additions made to try and clarify ideas further. These include
 simulations, derivations or references that I found helpful in working through
 Lumley's material. Most of the data sets that I use throughout these notes are
 from Lumley's website for the
-[book](https://r-survey.r-forge.r-project.org/survey/). 
-
+[book](https://r-survey.r-forge.r-project.org/survey/). Some data sets are not
+available, or at least I was not able to find them, or the the documentation for
+the data was not available. I remark on this when relevant in my notes below.
 
 ### How to use these notes?
 
@@ -63,7 +72,7 @@ I'd imagine there are two general ways one might use these notes:
 1. As a quick reference on any of the code or topics.
 
 2. If you are working through the book, you may find these notes useful to 
-double check Lumley's code or you're understanding of the principles tested in
+double check Lumley's code or your understanding of the principles tested in
 the exercises. 
 
   * Note that Lumley's code was written at the time of publishing and much has
@@ -2662,6 +2671,8 @@ context but strongly prefer the forest plot and variations on it personally,
 since it does more than all the other to include representations of uncertainty
 about the tabulated estimates.
 
+::: {.panel-tabset}
+## Barplot
 ```{r barplot_medians}
 medians %>%
   ggplot(aes(x = racehpr, y = Median_BMI, fill = srsex)) +
@@ -2675,6 +2686,7 @@ medians %>%
   ggtitle("Median BMI Across Race, Sex")
 ```
 
+## Forest Plot
 ```{r forestplot_medians}
 medians %>%
   ggplot(aes(x = Median_BMI, y = racehpr, color = srsex)) +
@@ -2691,6 +2703,8 @@ medians %>%
     "overweight BMI."
   ))
 ```
+
+:::
 
 ## One Continuous Variable
 
@@ -3684,7 +3698,7 @@ the association between sodium and blood pressure is confounded by age.
 plot(BPXSAR ~ sodium, data = nhanes, type = "n")
 points(svyplot(BPXSAR ~ sodium,
   design = des, style = "transparent", xlab =
-    "Dietary Sodium (g/day)", ylab = "Systolic Blood Pressure (mm Hg)"
+    "Dietary Sodium (g/day)", ylab = "Systolic Blood Pressure (mm Hg)",
 ))
 lines((svysmooth(BPXSAR ~ sodium, des)))
 ```
@@ -8012,12 +8026,12 @@ There are no exercises for this chapter.
 
 # Session Info
 
-<details>
+<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" >Session Information</button><div id="collapseOne" class="accordion-collapse collapse"><div>
 
-```{r session_info}
+```{r sessionInfo}
 sessionInfo()
 ```
 
-</details>
+</div></div>
 
 # References
