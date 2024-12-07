@@ -17,9 +17,6 @@ format:
       - file: github-corner.html
     self-contained-math: true
     toc: true
-comments:
-  giscus: 
-    repo: apeterson91/ComplexSurveys
 editor: visual
 ---
 
