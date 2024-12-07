@@ -8,13 +8,15 @@ theme:
   light: lightly
 format: 
   html:
-    toc: true
-    html-math-method: katex
     code-link: true
     code-fold: true
     code-summary: "Show the code"
+    embed-resources: true
+    html-math-method: katex
     include-in-header:
       - file: github-corner.html
+    self-contained-math: true
+    toc: true
 comments:
   giscus: 
     repo: apeterson91/ComplexSurveys
